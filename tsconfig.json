@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    /* Deliberately OFF: turning this on injects `| undefined` into every
+       zbuffer[i], map[y][x] and renderSurface32[ofs] access, which would put
+       non-null assertions in the hottest loops in the codebase. */
+    "noUncheckedIndexedAccess": false,
+
+    /* Deliberately OFF: with this ON, esbuild emits a bare field declaration
+       *and* the constructor assignment, doubling hidden-class transitions on
+       Renderer, Sprite and the 6-surfaces-per-cell CellSurface objects.
+       With it OFF the emitted JS is exactly what you would write by hand. */
+    "useDefineForClassFields": false,
+
+    /* Deliberately OFF: createScreenSlice has an intentional fallthrough from
+       PHYS_CURT_DOWN into PHYS_DOOR_DOWN. TS does not honour a
+       `// falls through` comment, so this check cannot be satisfied. */
+    "noFallthroughCasesInSwitch": false,
+
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+
+    /* The library is browser-only. Ambient Node types are made available
+       to tests via tsconfig.tests.json, never to src. */
+    "types": []
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,57 @@
+{
+  "name": "raycaster-386",
+  "version": "0.1.0",
+  "description": "A raycasting engine in TypeScript. Renders like it's 1992; runs like it isn't.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "types": "tsc -p tsconfig.json --emitDeclarationOnly --declaration --outDir dist",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.tests.json",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "test:watch": "vitest",
+    "bench": "vitest run --config vitest.bench.config.ts",
+    "demo": "node scripts/demo.mjs",
+    "demo:watch": "node scripts/demo.mjs --watch"
+  },
+  "keywords": [
+    "raycasting",
+    "raycaster",
+    "engine",
+    "2.5d",
+    "retro",
+    "typescript",
+    "html5",
+    "games",
+    "laboralphy"
+  ],
+  "author": {
+    "name": "Raphaël Marandet",
+    "email": "raphael.marandet@gmail.com"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.0.8",
+    "@types/node": "^26.5.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
