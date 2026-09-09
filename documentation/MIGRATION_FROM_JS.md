@@ -559,36 +559,48 @@ Tilesets are decoded lazily — only when a decal names one — so a sheet that
 only entities use costs nothing, and they are returned undecorated rather than
 pre-shaded, since what a game does with a sprite sheet is the game's business.
 
-## 12. Scope: a library, not a framework
+## 12. Scope: three tiers, one arrow
 
-The original grew into a framework: `Engine.js` alone is 51.6 kB and owns the
-game loop, asset loading, audio, the entity tier and the camera's AI. This port
-is deliberately not that. It is a set of modules a game calls; it never calls
-the game.
+The original grew into a framework: `Engine.js` alone is 1,529 lines and owns
+the game loop, asset loading, audio, the entity tier and the camera's AI. This
+port is deliberately not that — but the problem with it was *control direction*,
+not feature count. Collision, actor movement and sector triggers can all ship
+without a single line of `Engine`.
 
-Concretely, what remains worth taking from `libs/`:
-
-| Piece | Original | Size |
+| Tier | Owns | Never |
 |---|---|---|
-| Wall collision | `libs/wall-collider` | 84 lines |
-| Tag grid | `libs/tag-grid` | 172 lines |
-| Sector registry | `libs/sector-registry` | 109 lines |
+| **1. Renderer** — `raycaster-386` | Turning world state into pixels. | Time. Input. I/O. |
+| **2. Simulation** — `raycaster-386/engine` | Advancing world state by a tick. | Importing tier 1. Owning a loop. Touching the DOM. |
+| **3. Game** — the caller | The loop, input, rules, assets, audio, UI. | — |
 
-Roughly 370 lines, each standalone and each opt-in.
+**The invariant is the arrow: tier 2 never imports tier 1.** A god object
+exists precisely to hold both sides at once, so forbidding the import is what
+prevents one forming. §7 already states this for the door layer, and it is why
+`DoorManager.process()` returns cell updates as plain data rather than calling
+the renderer itself.
 
-And what is deliberately out, with the demo showing how a caller supplies it:
+Two consequences worth stating, because they are what the rule buys:
 
-| Piece | Original | Why out |
-|---|---|---|
-| Game loop, asset pipeline, audio | `Engine.js`, 51.6 kB | the caller owns its loop and its I/O |
-| Entity AI | `thinkers/`, 48 kB | a framework of its own; `FPSControlThinker` is demo material |
-| Entities, hordes, blueprints | `Entity`, `Horde`, `Blueprint` | the entity tier, reported by `loadLevel` and built by the game |
-| Post-processing | `filters/`, 44 kB | at most a separate package later |
-| Schema machinery | `documents/`, `translator`, `json-validate` | replaced by strict resolution plus the `validate` hook (§11) |
+**Golden-image tests exist because tier 1 is a pure function of world state.**
+Keep tier 2 equally pure — data in, deltas out — and it is unit-testable with
+no canvas, which is why `doorAnimation.test.ts` can drive a door from shut to
+open without rendering anything.
 
-That is about 150 kB of framework the library does not absorb.
+**A headless server is the acceptance test.** If tier 2 can run a game room in
+Node with no canvas — accepting input, ticking, emitting deltas — the
+separation is real. Time is already ticks rather than wall-clock, and
+`src/engine/` has zero DOM references today. The two things standing in the way
+are that `CellMap` still lives inside `Renderer`, and that the no-DOM rule is a
+convention rather than a typecheck.
 
----
+What is deliberately out: the game loop (it owns time), `FPSControlThinker` (it
+reads input devices), the asset registry and audio (I/O), and `Engine.js` as a
+shape. Visual filters post-process a finished canvas and need neither tier, so
+they are a separate package rather than a third entry point here.
+
+The feature-by-feature inventory — every piece of `libs/engine`, its line
+count, its dependencies, its tier and a verdict, with the work sequenced into
+phases — is in [ENGINE_INVENTORY.md](ENGINE_INVENTORY.md).
 
 ## Appendix: commands
 

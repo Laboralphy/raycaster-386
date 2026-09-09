@@ -35,13 +35,19 @@ renders all 34 golden cases; 29 are pixel-identical to the original and 5
 differ deliberately (see below), and it is ~3% faster overall. `npm run demo`
 plays it.
 
-This is a **library, not a framework**: a game owns its loop, its I/O and its
-entities, and calls in. The 150 kB of `Engine.js`, thinkers and filters that
-sat above the renderer upstream is deliberately not being ported — see §12 of
-the migration doc for what is in scope and what is not.
+The library is built in **three tiers**: the renderer turns world state into
+pixels, the simulation layer advances world state by a tick, and the game owns
+the loop, input and rules. The invariant is the arrow — **tier 2 never imports
+tier 1** — which is what keeps a god object like the original's `Engine.js`
+from forming, and what would let the simulation run headless on a server. See
+§12 of the migration doc, and
+[documentation/ENGINE_INVENTORY.md](documentation/ENGINE_INVENTORY.md) for what
+is in scope, what is not, and in what order.
 
 Migration progress, decisions and known gaps are recorded in
-[documentation/MIGRATION_FROM_JS.md](documentation/MIGRATION_FROM_JS.md).
+[documentation/MIGRATION_FROM_JS.md](documentation/MIGRATION_FROM_JS.md), and
+what remains of the original engine is inventoried feature by feature in
+[documentation/ENGINE_INVENTORY.md](documentation/ENGINE_INVENTORY.md).
 
 ## Design decisions
 
