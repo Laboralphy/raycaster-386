@@ -30,6 +30,18 @@ export function circleInRect(
 }
 
 /**
+ * The angle from (x1, y1) to (x2, y2), measured from the +x axis.
+ *
+ * The only transcendental in the simulation tier's dependencies. It is used by
+ * `Dummy.angleTo`, a query, never by the collision solver — so a client and
+ * server simulating in lockstep are not exposed to `Math.atan2` being
+ * unspecified in precision. Keep it that way.
+ */
+export function angle(x1: number, y1: number, x2: number, y2: number): number {
+    return Math.atan2(y2 - y1, x2 - x1);
+}
+
+/**
  * Linear interpolation: the y of `v` on the segment (x1, y1)-(x3, y3).
  */
 export function linear(v: number, x1: number, y1: number, x3: number, y3: number): number {

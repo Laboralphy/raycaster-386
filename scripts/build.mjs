@@ -10,7 +10,7 @@ const watch = process.argv.includes('--watch');
 const common = {
     entryPoints: {
         index: 'src/index.ts',
-        engine: 'src/engine/index.ts',
+        simulation: 'src/simulation/index.ts',
         schema: 'src/level/schema.ts'
     },
     bundle: true,
@@ -23,7 +23,7 @@ const common = {
 };
 
 /**
- * The renderer, the engine layer and the level schema are separate bundles: a
+ * Rendering, simulation and the level schema are separate bundles: a
  * project that only needs rendering should not pull in door simulation, and
  * one that does not validate levels at load time should not pay for 22 kB of
  * schema. The split also keeps the dependency direction visible.

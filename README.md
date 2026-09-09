@@ -12,7 +12,7 @@ npm install
 npm run check      # typecheck + test + build
 npm run demo       # playable demo on http://localhost:8080
 npm run bench      # port vs the original engine
-npm run build      # dist/index.js + dist/engine.js
+npm run build      # dist/index.js + dist/simulation.js
 ```
 
 ## Status
@@ -29,16 +29,17 @@ npm run build      # dist/index.js + dist/engine.js
 | 7 | Renderer-level demo | done |
 | 8 | RCE-100 level loading | done |
 
-`libs/raycaster` is fully ported, plus the first slice of the engine layer
+`libs/raycaster` is fully ported, plus the first slice of the simulation tier
 (doors and easing) and a loader for the map editor's saved format. The port
 renders all 34 golden cases; 29 are pixel-identical to the original and 5
 differ deliberately (see below), and it is ~3% faster overall. `npm run demo`
 plays it.
 
-The library is built in **three tiers**: the renderer turns world state into
-pixels, the simulation layer advances world state by a tick, and the game owns
-the loop, input and rules. The invariant is the arrow — **tier 2 never imports
-tier 1** — which is what keeps a god object like the original's `Engine.js`
+The library is built in named tiers: **Core** holds what both sides need,
+**Rendering** turns world state into pixels, **Simulation** advances world
+state by a tick, and **Game** — the caller, not shipped here — owns the loop,
+input and rules. The invariant is the arrow — **Simulation never imports
+Rendering** — which is what keeps a god object like the original's `Engine.js`
 from forming, and what would let the simulation run headless on a server. See
 §12 of the migration doc, and
 [documentation/ENGINE_INVENTORY.md](documentation/ENGINE_INVENTORY.md) for what
@@ -98,15 +99,17 @@ wall distance, so normalising the two distance scales would shift the look.
 ```
 src/
   consts.ts               face / phys / fx codes, as const unions rather than enums
-  core/
-    canvas.ts             canvas creation, pixel filter, image loading (not used by the render path)
+  core/                   Core: shared by rendering and simulation, no DOM
+    CellMap.ts            flat Uint32Array of packed cell codes; read by both tiers
+    cells.ts              world/cell conversion, cell centres, block swaps
+    Vector.ts             2D vector; immutable add/sub, mutable translate/scale
     Rainbow.ts            CSS colour parsing, dependency-free so shading is testable under Node
     MarkerRegistry.ts     set of marked 2D positions
     Grid.ts               dense 2D grid (replaces @laboralphy/grid)
     bresenham.ts          line walk with early abort
     geometry.ts           distance, circleInRect, linear
+    canvas.ts             canvas creation, pixel filter, image loading (Rendering only)
   map/
-    CellMap.ts            flat Uint32Array of packed cell codes
     CellSurfaceManager.ts per-face decals and light strips
     MapHelper.ts          builds a renderer from a saved level (legend + grid)
   texture/
@@ -122,14 +125,21 @@ src/
     constants.ts          "@PHYS_WALL" and friends, resolved strictly
     loadLevel.ts          builds a renderer; reports what it does not handle
     rce-100.json          the format schema, shipped unmodified on its own entry point
-  engine/                 simulation above the renderer; separate bundle
+  simulation/             world state advanced by a tick; separate bundle
+    DoorPolicy.ts         which cells are doors, and opening, closing, locking them
+    neighbors.ts          the cells around a cell, bounded by the map
+    wallCollider.ts       slides a mobile along walls instead of sticking
+    Smasher.ts            actor-vs-actor collision over a coarse sector grid
+    Dummy.ts              one actor's collision body: circle, masks, force field
+    ForceField.ts         the forces pushing on one actor this tick
+    SectorRegistry.ts     buckets actors so only near neighbours are compared
     Easing.ts
     DoorContext.ts        one door's state machine
     DoorManager.ts        ticks every door, reports cell updates
     TypedEmitter.ts
 ```
 
-`src/engine/` never imports the renderer. See §7 of the migration doc for why.
+`src/simulation/` never imports the renderer. See §7 of the migration doc for why.
 
 ### Cell encoding
 
@@ -225,6 +235,30 @@ Two more surfaced later:
 - **`MapHelper` silently dropped block lights.** `buildMaterialItem` did not
   copy `light` onto the material it built, so the branch that creates a light
   per cell could never fire and `blockLights` always came back empty.
+- **Exactly coincident actors produced a `NaN` collision force.** The original
+  normalised a zero-length vector to get a separating direction, summed the
+  resulting `(NaN, NaN)` onto the actor's force, and then discarded it — so a
+  caller that added that force to a position corrupted the position permanently,
+  with nothing left to show where it came from. The port separates coincident
+  actors along a fixed axis, and `Vector.normalize()` returns zero rather than
+  `NaN`.
+- **`isDoorOpen` always threw.** `Engine.isDoorOpen` called
+  `oDoor.isDoorOpen(x, y)`, which `DoorContext` does not define, so every cell
+  that had a door context raised a TypeError. Dead code upstream, since nothing
+  reachable called it; ported as `dc.isOpen()`.
+- **A secret passage could pair with a block on the far edge of the map.** The
+  neighbour walk read `getCellPhys(-1, y)`, and `CellMap` indexes a flat array
+  with no bounds check, so that is the last cell of the row above. The port's
+  `forEachNeighbor` skips cells outside the map.
+- **A secret passage restored from the wrong end ran backwards.** Saved door
+  state recorded nothing distinguishing the block that pushes from the block
+  that is pushed, so reloading rebuilt the passage with the roles swapped. The
+  state entry now carries the leading half's child cell.
+- **A restored door forgot how far it had slid.** `DoorContext.setState`
+  computed the easing at the restored time and discarded the result, never
+  assigning `_offset`. A save reloaded with a half-open door reported offset 0
+  until the next tick, so the door drew shut for a frame. Found by writing the
+  round-trip test that `DoorManager.setState` needed.
 
 And two dead-code bugs fixed in passing: `getMemoryUsage()` called a method
 that does not exist and so always threw, and `optimizeBuffer` pushed the same

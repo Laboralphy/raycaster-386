@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DoorContext, DoorManager } from '../../src/engine/index.js';
+import { DoorContext, DoorManager } from '../../src/simulation/index.js';
 import { PHYS_DOOR_UP } from '../../src/consts.js';
 import { hasLegacy, importLegacy } from '../harness/legacy.js';
 

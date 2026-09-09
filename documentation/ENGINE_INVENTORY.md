@@ -11,24 +11,39 @@ The collision, tag and geometry machinery it pulls from `libs/` adds ~1,100.
 
 ## The rule
 
-| Tier | Owns | Never |
-|---|---|---|
-| **1. Renderer** — `raycaster-386` | Turning world state into pixels: map rendering, textures, lighting, sprites, level loading. | Time. Input. I/O. |
-| **2. Simulation** — `raycaster-386/engine` | Advancing world state by a tick: doors, movement, collision, triggers, actors. | Importing tier 1. Owning a loop. Touching the DOM. |
-| **3. Game** — the caller | The loop, input, rules, assets, audio, UI. | — |
+| Tier | Owns | Needs | Never |
+|---|---|---|---|
+| **0. Core** — shared | Data and maths both sides need: the cell map, grid, markers, geometry, bresenham, the cell codes. | nothing | — |
+| **1. Rendering** — `raycaster-386` | Turning world state into pixels: map rendering, textures, lighting, sprites, level loading. | a screen | Time. Input. I/O. |
+| **2. Simulation** — `raycaster-386/simulation` | Advancing world state by a tick: doors, movement, collision, triggers, actors. | a clock | Importing Rendering. Owning a loop. Touching the DOM. |
+| **3. Game** — the caller, not shipped here | The loop, input, rules, assets, audio, UI. | a player | — |
 
-**The invariant is the arrow: tier 2 never imports tier 1.** That single
+Each tier is defined by what it *needs*. `ShadedTileSet` pre-computes distance
+shading and is pointless with nothing to display; `DoorContext` advances a door
+by a tick and is meaningful with no screen at all. That is the whole test.
+
+**The invariant is the arrow: Simulation never imports Rendering.** That single
 constraint is what stops an `Engine` god object from forming, because such an
 object exists precisely to hold both sides at once. A feature that cannot be
-written without reaching across belongs in tier 3.
+written without reaching across belongs in Game.
 
-`src/engine/index.ts` already states this for the door layer. The rest of this
+`src/simulation/index.ts` already states this for the door layer. The rest of this
 document applies it to everything else.
 
-**The acceptance test is a headless server.** If tier 2 can run a game room in
+**The acceptance test is a headless server.** If Simulation can run a game room in
 Node with no canvas — accepting input, ticking, and emitting deltas — the
 separation is real. If it cannot, something has been put in the wrong tier.
-See §5.
+See §5. Alongside it, `demo/` is the Tier-3 exemplar: `demo/world.ts` holds a
+whole simulation and knows nothing about the DOM, `demo/main.ts` is the only
+file that touches the browser, and `tests/demo/world.test.ts` already runs the
+lot headlessly. Growing it to exercise each new subsystem is what shows the
+library is usable from outside.
+
+**`games/mansion` is a reference, not a migration target.** It is not being
+ported. It earns its place as the only real evidence of what a game asks of
+this library — it is how the `extra.blueprints` gap in §3.1 surfaced, and how
+`FPSControlThinker` turned out to be input-agnostic — and §4.7 measures its
+demands rather than guessing at them.
 
 ## Verdicts
 
@@ -37,7 +52,7 @@ See §5.
 | **done** | already in this port |
 | **take** | belongs in the perimeter; port it |
 | **split** | part belongs here, part does not; the row says where the seam is |
-| **skip** | tier 3 or out of scope; the demo shows a caller doing it |
+| **skip** | Game tier or out of scope; the demo shows a caller doing it |
 | **never** | actively unwanted, with a reason |
 
 ---
@@ -46,24 +61,24 @@ See §5.
 
 | Feature | Original | Now | Tier |
 |---|---|---|---|
-| Level building | `Engine.buildLevel` (1157-1498, 342 lines) | `src/level/` | 1 |
-| Door animation | `DoorContext` (207), `DoorManager` (67) | `src/engine/` | 2 |
-| Easing curves | `libs/easing` (207) | `src/engine/Easing.ts` | 2 |
-| Light sources | `Engine.createLightSource`/`removeLightSource` (1129-1156) | `Renderer.addLightSource` | 1 |
-| Renderer options | `Engine.initializeRenderer`, `updateRaycasterOption` (113-152) | typed setters | 1 |
-| Symbol resolution | `libs/translator` (92), non-strict | `src/level/constants.ts`, strict | 1 |
-| Texture decoding | `libs/canvas-helper` | the caller's `loadImage` | 3 |
-| Marker sets | `libs/marker-registry` | `src/core/MarkerRegistry.ts` | shared |
-| 2D grid | `@laboralphy/grid` | `src/core/Grid.ts` | shared |
+| Level building | `Engine.buildLevel` (1157-1498, 342 lines) | `src/level/` | Rendering |
+| Door animation | `DoorContext` (207), `DoorManager` (67) | `src/simulation/` | Simulation |
+| Easing curves | `libs/easing` (207) | `src/simulation/Easing.ts` | Simulation |
+| Light sources | `Engine.createLightSource`/`removeLightSource` (1129-1156) | `Renderer.addLightSource` | Rendering |
+| Renderer options | `Engine.initializeRenderer`, `updateRaycasterOption` (113-152) | typed setters | Rendering |
+| Symbol resolution | `libs/translator` (92), non-strict | `src/level/constants.ts`, strict | Rendering |
+| Texture decoding | `libs/canvas-helper` | the caller's `loadImage` | Game |
+| Marker sets | `libs/marker-registry` | `src/core/MarkerRegistry.ts` | Core |
+| 2D grid | `@laboralphy/grid` | `src/core/Grid.ts` | Core |
 
 ---
 
-## 2. Structural work — do this before anything else
+## 2. Structural work — **done**
 
-Three changes that cost little now and a great deal after collision, triggers
-and actors have been built on the current shape.
+Three changes that cost little then and a great deal once collision, triggers
+and actors were built on the old shape. Completed as phase A.
 
-### 2.1 Extract `CellMap` from `Renderer` — `take`, structural
+### 2.1 Extract `CellMap` from `Renderer` — **done**
 
 `Renderer.ts:128` owns `private _map = new CellMap()`, and `getCellPhys`
 (371), `setCellPhys` (349) and `getCellMaterial` (367) are renderer methods.
@@ -76,22 +91,42 @@ canvas and light map — purely to answer that question.
 DOM, no imports beyond `consts`. **It is world state that happens to live in
 the render tier.** Hand it to the renderer instead of hiding it inside one.
 
-`CellSurfaceManager` (decals, light strips) and `LightMap` stay in tier 1 —
+`CellSurfaceManager` (decals, light strips) and `LightMap` stay in Rendering —
 those genuinely are appearance.
 
-### 2.2 Enforce the no-DOM rule — `take`, ~10 lines of config
+**Done:** `CellMap` moved to `src/core/CellMap.ts` (Core). `Renderer` takes one
+as an optional constructor argument and exposes `get cellMap()`, so a game can
+share one map between tiers and a server can hold one with no renderer at all.
+The `CELL_*` masks stayed in `src/consts.ts`, which is already DOM-free and
+shared; splitting that module is a separate, optional tidy-up.
+
+One rule came out of it, documented on the accessor: **reads are free, writes go
+through the renderer while one is attached.** `setCellPhys` also re-traces the
+light map and `setMapSize` resizes the surface and light buffers, so writing to
+the shared map directly skips both. That is not a new constraint — it is why
+`DoorManager.process()` already returns deltas for the caller to apply rather
+than mutating anything itself.
+
+### 2.2 Enforce the no-DOM rule — **done**
 
 `tsconfig.json` sets `lib: ["ES2022", "DOM"]` for all of `src`, so nothing
-stops a future tier-2 file from reaching for `document`. Give `src/engine/` its
+stops a future Simulation file from reaching for `document`. Give `src/simulation/` its
 own tsconfig with `lib: ["ES2022"]` and no DOM, and a violation becomes a
 typecheck failure rather than something a reviewer has to notice.
 
 The same trick already keeps Node types out of `src` via `types: []`.
 
-Audited today: `src/engine/` has **zero** references to `document`, `window`,
+Audited: `src/simulation/` has **zero** references to `document`, `window`,
 `HTMLCanvas`, `Image`, `requestAnimationFrame` or `performance`.
 
-### 2.3 `DoorManager` state setter — `take`, ~15 lines
+**Done:** `tsconfig.simulation.json` type-checks `src/simulation/` with
+`lib: ["ES2022"]` and no DOM, and `npm run typecheck` runs it. Verified by
+injecting `const _violation: HTMLCanvasElement` into `DoorManager.ts`: the new
+config fails with `TS2304: Cannot find name 'HTMLCanvasElement'` while the main
+config accepts it, so the check does work the existing build did not. Because
+tsc follows imports, it also keeps `src/core/` and `src/consts.ts` DOM-free.
+
+### 2.3 `DoorManager` state setter — **done**
 
 `DoorManager` has a `state` getter and no setter. The original restored by
 replaying `openDoor` and then forcing each context's phase
@@ -102,9 +137,21 @@ listeners see the live sequence. Only the manager-level restore is missing.
 Multiplayer promotes this from a nice-to-have to a requirement: reconnect and
 late-join both need it.
 
+**Done:** `DoorManager.setState(entries, build)`. It takes a factory because an
+entry records where a door is and how far through its cycle it got, but not the
+timings, easing or travel — those follow from the cell's phys code, which is
+door policy (§4.1) and not ported. §4.1 will supply a default `build`.
+
+Writing the round-trip test found a sixth inherited bug: **`DoorContext.setState`
+never restored the offset.** It computed the easing at the restored time and
+threw the result away (`DoorContext.js:143` upstream), so a door reloaded
+mid-slide reported offset 0 until its next tick and drew shut for a frame. Now
+the sliding phases take their offset from the easing; `OPEN` and `DONE` keep
+setting theirs in `initPhase`.
+
 ---
 
-## 3. Tier 1 — the renderer
+## 3. Rendering
 
 ### 3.1 Decorative objects — `take`, ~120 lines
 
@@ -128,7 +175,7 @@ And it maps almost one-to-one onto `Sprite`, which is fully ported:
 | `blueprint.fx: ["@FX_LIGHT_SOURCE"]` | `sprite.flags`; `resolveConstants` already resolves these |
 | `blueprint.lightsource: {r0,r1,v}` | `rc.addLightSource(...)` |
 | `object.angle` | `setDirection`, given an angle→index mapping |
-| `blueprint.size` | reported, not acted on — a tier-2 collision radius |
+| `blueprint.size` | reported, not acted on — a Simulation collision radius |
 | `blueprint.thinker` | reported; "do nothing" in every shipped level |
 
 Animation definitions live on the tileset and are already in the right shape —
@@ -139,21 +186,39 @@ array-of-starts form.
 Best as a separate `buildObjects(rc, loaded)` call rather than a `loadLevel`
 flag, so a game with its own object handling does not pay for one it discards.
 
+**Prerequisite: `loadLevel` cannot yet take blueprints from outside the level.**
+`Engine.buildLevel(data, extra)` merges caller-supplied `extra.blueprints` and
+`extra.tilesets` into the level's own before building, and `extra.startpoint`
+picks the start point. `games/mansion` depends on it — its bestiary is shared
+across levels and compiled at runtime, so it is never in the level JSON:
+
+```js
+extra.tilesets   = DATA.TILESETS;
+extra.blueprints = this.getCompiledBlueprints();
+await this.buildLevel(oLevelData, extra);
+```
+
+Any game with a shared bestiary works the same way. Without it, decorative
+objects can only resolve blueprints a level happens to carry inline.
+`LoadLevelOptions` needs `blueprints?` and `tilesets?`, merged before use;
+`startpoint` is already there. Small, but a prerequisite for phase F, not a
+nice-to-have.
+
 ### 3.2 Sprite facing — `take`, ~20 lines
 
 `Horde.updateLookingAngle` (`Horde.js:67-86`) picks a sprite's directional
 frame from the camera angle. That is a sprite concern sitting inside the entity
 registry; `src/Sprite.ts` is already ported and `setDirection` is already there.
-Lift it alone, into tier 1, and leave `Horde` to §4.6.
+Lift it alone, into Rendering, and leave `Horde` to §4.6.
 
 ---
 
-## 4. Tier 2 — the simulation
+## 4. Simulation
 
 Everything here manipulates world state as plain data. None of it needs a
 canvas. Roughly **2,400 lines** on top of the 274 already ported.
 
-### 4.1 Door policy — `take`, ~213 lines
+### 4.1 Door policy — **done**
 
 `Engine._checkDoorClosability` (317-331), `_buildDoorContext` (332-387),
 `_doorProcess` (388-402), `openDoor` (619-646), `lockDoor` (647-663),
@@ -167,10 +232,24 @@ writing the policy yourself, as `demo/world.ts` does.
 
 The missing half of something already ported, and it closes §2.3.
 
-Depends on: `DoorContext`, `MarkerRegistry` (locks), `CellMap` (§2.1). The
-closability check takes a callback, so it need not know about actors.
+**Done:** `src/simulation/DoorPolicy.ts`. It holds a `DoorManager` and a locks
+`MarkerRegistry`, reads a cell's phys code to know a door is there, and gives
+it the travel and timing that code implies. `isCellOccupied` is a constructor
+callback rather than a call into an actor registry, so the tier stays actor-free
+— without one, doors always close. It supplies the default `build` that §2.3
+left open, so `DoorPolicy.setState(entries)` restores doors on its own.
 
-### 4.2 Secret passages — `take`, ~143 lines
+Two more inherited bugs surfaced:
+
+- **`Engine.isDoorOpen` always threw.** It called `oDoor.isDoorOpen(x, y)`, a
+  method `DoorContext` does not define, so every cell that had a context raised
+  a TypeError. Dead code upstream; ported as `dc.isOpen()`.
+- **A secret passage restored from the wrong end ran backwards.** Saved state
+  recorded no way to tell the two halves apart, so rebuilding from the trailing
+  block made it the pusher. `DoorManagerStateEntry` now carries the leading
+  half's `child` cell, and `DoorPolicy.setState` restores leaders first.
+
+### 4.2 Secret passages — **done**
 
 `Engine._forEachNeighbor` (209-251), `_buildSecretDoorContext` (252-316),
 `_getSecretNeighborDoorContext` (601-618), `isSecretBlock` (705-721).
@@ -179,9 +258,14 @@ A block that recesses and drags its neighbour with it. Pure cell-offset work;
 the recessed-wall geometry it relies on (`projectRay.sameOffsetWall`) is
 already ported and golden-tested.
 
-Depends on: §4.1.
+**Done:** inside `DoorPolicy`, with the neighbour walk in
+`src/simulation/neighbors.ts`. A third inherited bug came out of it: **the
+neighbour walk could pair a block with one on the opposite map edge.**
+`CellMap` indexes a flat array with no bounds check, so `getPhys(-1, y)` reads
+the last cell of the row above. `forEachNeighbor` now skips cells outside the
+map, which is a deliberate divergence from the original.
 
-### 4.3 Cell helpers — `take`, ~76 lines
+### 4.3 Cell helpers — **done**
 
 `Engine.cellSize` (536-548), `getCellCenter` (549-562), `clipCell` (563-573),
 `alterBlock` (574-588), `pushCell` (589-600), `getCellType` (677-687).
@@ -193,7 +277,21 @@ the renderer.
 
 `pushCell` takes an entity upstream, but only to read its position.
 
-### 4.4 Wall collision — `take`, 84 lines
+**Done:** `src/core/cells.ts` — `worldToCell`, `cellCenter` and `alterBlock`.
+Two notes on what changed:
+
+- `clipCell` was renamed `worldToCell`. It clips nothing; it converts. A caller
+  wanting the result inside the map clamps it against `map.size`.
+- `alterBlock` returns a `CellChange` rather than writing to a renderer,
+  matching `DoorCellUpdate`: a phys change re-traces every overlapping light,
+  so the write has to go through the renderer when one is attached. Looking the
+  material up by `ref` stays with the caller, which is who holds the table
+  `loadLevel` returns.
+
+`getCellType` needed no port — it is `map.getPhys`. `pushCell` is
+`openDoor` plus a tag event, so it lands with §4.9.
+
+### 4.4 Wall collision — **done**
 
 `libs/wall-collider`. Slides a circle along walls instead of letting it stick.
 
@@ -201,7 +299,13 @@ the renderer.
 and the cheapest thing here to port. `demo/world.ts` already hand-rolls a
 version of it off `getCellPhys`.
 
-### 4.5 Actor collision — `take`, ~533 lines
+**Done:** `src/simulation/wallCollider.ts`. `isSolid` is a callback taking a
+world position, so it knows nothing about the map and a caller can answer from
+cell phys, a door's state, or anything else.
+`tests/differential/wallCollider.diff.test.ts` proves it bit-identical to the
+original across 900 cases and a 200-step walk where each step feeds the next.
+
+### 4.5 Actor collision — **done**
 
 `libs/smasher` (`Smasher` 219, `Dummy` 146), `libs/force-field` (59),
 `libs/sector-registry` (`SectorRegistry` 68, `Sector` 41).
@@ -213,6 +317,28 @@ Depends on: `libs/geometry` + `Vector` (286 total; take the subset actually
 used), `libs/array-helper` (109, for `Sector`), `@laboralphy/grid`
 (**ported**), `events` (replace with the ported `TypedEmitter`).
 
+**Done:** `Dummy`, `ForceField`, `Sector`/`SectorRegistry` and `Smasher` in
+`src/simulation/`. Nothing is moved: each overlap contributes a separating
+force, the resultant lands on `dummy.force`, and the caller decides what to do
+with it. `Dummy` holds a position, radius, tangibility masks and an opaque
+`entity` id — no sprite, no behaviour — which is the shape §4.6 needs.
+
+`tests/differential/smasher.diff.test.ts` proves it bit-identical to the
+original across a 40-actor crowd, tangibility masks, and 25 ticks of feeding
+each tick's force back into position, where any divergence compounds. Two
+harness additions made that possible: the grid shim gained the `rebuild` event
+`SectorRegistry` needs, and `importLegacyBundle` bundles several original
+modules into one module graph so their `instanceof` checks hold.
+
+A tenth inherited bug: **exactly coincident actors produced a `NaN` force.**
+`_computeSmashingForces` normalised a zero-length vector, `computeForces`
+summed the `NaN` onto `dummy.force`, and a caller adding that to a position
+made the position `NaN` permanently. `reduceForces` then discarded the force,
+so nothing survived to show where the corruption came from. The port separates
+coincident actors along a fixed axis, which is deterministic — lockstep needs
+that — and `Vector.normalize()` returns zero rather than `NaN` for a zero
+vector.
+
 ### 4.6 Actors — `split`, ~448 lines
 
 `Entity` (136), `Horde` (171), `Engine.createEntity` (988-1057),
@@ -220,33 +346,70 @@ used), `libs/array-helper` (109, for `Sector`), `@laboralphy/grid`
 `_syncEntityDummy` (1093-1105), `_smashEntity` (1106-1128).
 
 **This is the most important seam in the migration.** Upstream, `Entity` holds
-a `.sprite` — a tier-1 object. A tier-2 actor must hold position, size, inertia
+a `.sprite` — a Rendering-tier object. A Simulation actor must hold position, size, inertia
 and state plus an opaque id; binding that id to a `Sprite` is the game's job,
-or a thin tier-1 adapter's.
+or a thin Rendering-tier adapter's.
 
 Cut that link and the same actor code runs on a server with no renderer. Leave
-it and tier 2 imports tier 1, and the whole separation collapses.
+it and Simulation imports Rendering, and the whole separation collapses.
 
-`Blueprint` (21) similarly splits: the tileset/animation half is tier-1 sprite
-construction (§3.1), the size/behaviour half is a tier-2 actor template.
+`Blueprint` (21) similarly splits: the tileset/animation half is Rendering-tier sprite
+construction (§3.1), the size/behaviour half is a Simulation actor template.
 
-`linkEntityLightSource` reaches into the renderer's light list — in tier 2 it
+`linkEntityLightSource` reaches into the renderer's light list — in Simulation it
 becomes "this actor emits light", reported as data, applied by whoever owns
 both.
 
-### 4.7 Behaviour — `split`, ~477 of 785 lines
+### 4.7 Behaviour — `take`, ~764 of 785 lines
 
 `thinkers/`: `Thinker` (102), `MoverThinker` (139), `TangibleThinker` (44),
-`StaticThinker` (17), `StaticTangibleThinker` (18), `MissileThinker` (157).
+`StaticThinker` (17), `StaticTangibleThinker` (18), `MissileThinker` (157),
+`FPSControlThinker` (287).
 
-Movement and projectile maths over actors. A base class the *game* subclasses
-and the simulation ticks is a callback, not inversion of control, so it passes
-the rule.
+Movement, projectile and first-person-control maths over actors. A base class
+the *game* subclasses and the simulation ticks is a callback, not inversion of
+control, so it passes the rule.
 
-`FPSControlThinker` (287) reads the keyboard and mouse — **tier 3**. It is the
-player controller, and belongs in the demo. Plus `Engine._useThinker`,
-`useThinkers`, `createThinkerInstance` (836-906): a string-keyed registry with
-Levenshtein "did you mean" suggestions — replace with passing constructors.
+**`FPSControlThinker` belongs here, not in Game.** An earlier verdict put it out
+of scope on the grounds that it reads the keyboard. It does not: it imports only
+`Easing`, `TangibleThinker`, consts and `Vector`, and takes input through an
+abstract command API — `keyDown(key)`, `keyUp(key)`, `isCommandOn(cmd)`,
+`setupCommands(keyMap)`, `look(x)`. The *caller* wires the DOM:
+
+```js
+window.addEventListener('keydown', e => engine.camera.thinker.keyDown(e.key));
+```
+
+That is the same shape as `loadImage` and `DoorPolicy`'s `isCellOccupied`: the
+host supplies the primitive, the logic stays inside. `games/mansion`'s
+`PlayerThinker` extends it, which is the intended use.
+
+Only `Engine._useThinker`, `useThinkers`, `createThinkerInstance` (836-906) stay
+out — a string-keyed registry with Levenshtein "did you mean" suggestions,
+replaced by passing constructors.
+
+#### The surface a real game needs
+
+`games/mansion/src/thinkers.d/` is 2,280 lines of game-side AI across 20+
+thinkers — `VengefulThinker` (448) alone dwarfs anything here — all subclassing
+these bases. It is not being ported, but what it *touches* is the measured
+contract for this section:
+
+| Surface | Uses | Tier |
+|---|---|---|
+| `entity.position` | 16 | Simulation |
+| `context.game` | 13 | Game — the thinker's own context object |
+| `entity.data` | 12 | Simulation — free-form per-actor bag |
+| `entity.sprite` | 9 | **Rendering** — the seam §4.6 must cut |
+| `engine.filters` | 6 | separate package (§6.4) |
+| `engine.getTime` | 4 | Game — owns the clock |
+| `entity.dead`, `entity.dummy`, `entity.size` | 7 | Simulation |
+| `createEntity`, `pushCell`, `getCellCenter`, `delayCommand` | 6 | Simulation |
+
+Note `entity.sprite`: real game AI reaches for a sprite from inside a thinker,
+nine times over. "Actors do not hold sprites" therefore needs a designed answer
+rather than a prohibition — most likely the game's own actor wrapper holds the
+sprite while the Simulation actor holds an id.
 
 ### 4.8 Tag grid — `take`, 172 lines
 
@@ -276,11 +439,23 @@ Delay, loop and cancel commands against the simulation clock. It takes a tick
 count rather than reading a clock, so it is deterministic and serialisable —
 which is what moves it inside the perimeter rather than out with the loop.
 
-### 4.11 Vector maths — `take`, subset of 286 lines
+### 4.11 Vector maths — **done**
 
 `libs/geometry` (`index` 108, `Vector` 152, `Point` 26). Needed by §4.5.
 `src/core/geometry.ts` already covers distance, `circleInRect` and `linear`;
 take only what collision actually uses rather than the whole module.
+
+**Done:** `src/core/Vector.ts` plus `angle` added to `core/geometry.ts`.
+Measured first — collision touches only `add`, `sub`, `scale`, `normalize`,
+`squareDistance`, `distance` and `angle`. Two changes from the original: its
+single `mul` returned either a vector or a dot product depending on its
+argument's type, split here into `mul` and `dot`; and `normalize()` no longer
+divides by zero. The mixed mutability is preserved and documented, because
+`v.normalize().scale(n)` depends on it.
+
+`angle` is the only transcendental the tier pulls in, and only `Dummy.angleTo`
+— a query — uses it, so lockstep simulation is not exposed to `Math.atan2`
+being unspecified in precision.
 
 ### 4.12 Position — `take`, 56 lines
 
@@ -291,18 +466,18 @@ actor type rather than shipping a module.
 
 `Engine.getEngineState`/`setEngineState` (1499-1515), `getDoorManagerState`/
 `setDoorManagerState` (1516-1528). Serialises door phases, locks, tags and the
-clock. Every tier-2 subsystem needs the same pair — see §5.
+clock. Every Simulation subsystem needs the same pair — see §5.
 
 ---
 
 ## 5. What the headless-server test demands
 
-Tier 2 is the part a multiplayer server would run with no canvas: accept input,
+Simulation is the part a multiplayer server would run with no canvas: accept input,
 tick, emit deltas. Four constraints follow, and they are cheap to adopt now.
 
 **Deltas are the house pattern.** `DoorManager.process()` already returns
 `DoorCellUpdate[]` — `{x, y, phys, offset}` per door. That is a wire format.
-Every tier-2 subsystem should return what changed, not just mutate.
+Every Simulation subsystem should return what changed, not just mutate.
 
 **Snapshots on every subsystem.** `getState`/`setState`, as `DoorContext`
 already has. Late joiners and reconnects need them; §2.3 is the outstanding gap.
@@ -317,7 +492,7 @@ state. `DoorManager` passes today; keep it that way as the tier grows.
 ### Determinism
 
 Only relevant if server *and* client both simulate (prediction and
-reconciliation). Across all of tier 2 today there are exactly two
+reconciliation). Across all of Simulation today there are exactly two
 transcendental calls, both in optional easing curves — `sine` and `cosine`,
 `Easing.ts:51-52`. Everything else is `+ - * /` and `min`/`max`, which are
 IEEE-754 exact and identical across JS engines.
@@ -333,7 +508,7 @@ is, which is what a fixed-timestep server needs.
 
 ---
 
-## 6. Tier 3 and out of scope
+## 6. Game tier and out of scope
 
 ### 6.1 Game loop — `skip`, ~95 lines
 
@@ -343,55 +518,51 @@ loop driving doors, the scheduler, the horde and rendering. Worth *documenting*
 as a pattern in the demo rather than shipping — it is the one thing whose owner
 defines the tier boundary.
 
-### 6.2 Player control — `skip`, 287 lines
-
-`FPSControlThinker`. Reads input devices; see §4.7.
-
-### 6.3 Asset registry — `skip`, ~35 lines
+### 6.2 Asset registry — `skip`, ~35 lines
 
 `Engine.loadTileSet` (907-931), `getTileSet` (917). `loadLevel` already returns
 the tilesets a level referenced, decoded and undecorated.
 
-### 6.4 Canvas and screenshots — `skip`, ~84 lines
+### 6.3 Canvas and screenshots — `skip`, ~84 lines
 
 `Engine.setRenderingCanvas` (484-497), `getRenderingContext` (506),
 `screenshot` (470-483), `initializeCamera` (133-143). The caller wires its own
 canvas; `Renderer.renderCanvas` is exposed.
 
-### 6.5 Visual filters — `skip` here, separate package
+### 6.4 Visual filters — `skip` here, separate package
 
 `engine/filters/`: `Blur` (64), `FadeIn` (36), `FadeOut` (37), `Flash` (59),
 `Foreground` (30), `Halo` (54), `Link` (43), `Pulse` (93), `Timed` (38); plus
 `libs/filters` `AbstractFilter` (85), `FilterManager` (79). **642 lines.**
 
-They post-process a finished canvas, so they need neither tier 1 nor tier 2 —
+They post-process a finished canvas, so they need neither Rendering nor Simulation —
 only a `CanvasRenderingContext2D`. That makes them a clean standalone package,
 usable by any canvas project, rather than a third entry point here.
 
-### 6.6 Events plumbing — `skip`
+### 6.5 Events plumbing — `skip`
 
 `level.loading` progress, `level.load`, via `events`. `TypedEmitter` is already
 ported for the door layer; whoever owns the loop emits what it likes.
 
-### 6.7 Camera — `skip`, 6 lines
+### 6.6 Camera — `skip`, 6 lines
 
 `Camera` is an `Entity` subclass. Under §4.6 the camera is just an actor the
 game marks as the viewpoint.
 
-### 6.8 Misc helpers — `skip`
+### 6.7 Misc helpers — `skip`
 
 `libs/object-helper` (`Extender`, deep merge), `libs/levenshtein` (`suggest`,
 for "did you mean"), `libs/json-validate` (10 lines over `jsonschema` —
 replaced by the `validate` hook, §11 of the migration doc), `libs/canvas-helper`
 (replaced by `loadImage`).
 
-### 6.9 `Engine.js` as a class — `never`
+### 6.8 `Engine.js` as a class — `never`
 
 Not a feature but a shape. It is 1,529 lines because it became the place
 anything cross-cutting landed: it owned the loop, held the canvas, loaded
 assets, ran the AI, and every subsystem reached the others through it.
 
-**The guard is not a line budget.** It is this: every tier-2 module must be
+**The guard is not a line budget.** It is this: every Simulation module must be
 constructible and testable on its own, with no reference to a central object.
 `DoorManager` passes that test today. Ask it of each new one.
 
@@ -401,24 +572,27 @@ constructible and testable on its own, with no reference to a central object.
 
 Ordered by dependency, and by what gets expensive to change later.
 
-**A — structural.** Do first; everything else is built on it.
-1. Extract `CellMap` from `Renderer` (§2.1)
-2. No-DOM tsconfig for `src/engine/` (§2.2)
-3. `DoorManager` state setter (§2.3)
+**A — structural. Done.** Everything else is built on it.
+1. ~~Extract `CellMap` from `Renderer`~~ (§2.1)
+2. ~~No-DOM tsconfig for `src/simulation/`~~ (§2.2)
+3. ~~`DoorManager` state setter~~ (§2.3)
 
-**B — cells and doors.** Completes a layer that is already half-built.
-4. Door policy (§4.1)
-5. Cell helpers, onto `CellMap` (§4.3)
-6. Secret passages (§4.2)
+**B — cells and doors. Done.** Completed the half-built door layer.
+4. ~~Door policy~~ (§4.1)
+5. ~~Cell helpers~~ (§4.3)
+6. ~~Secret passages~~ (§4.2)
 
-**C — movement.** Cheapest first; `wall-collider` has no dependencies at all.
-7. `wall-collider` (§4.4)
-8. Vector subset (§4.11)
-9. Sector registry, then `Smasher` + `force-field` (§4.5)
+**C — movement. Done.** Actors can now be pushed around a map.
+7. ~~`wall-collider`~~ (§4.4)
+8. ~~Vector subset~~ (§4.11)
+9. ~~Sector registry, then `Smasher` + `force-field`~~ (§4.5)
 
-**D — actors.** The seam that decides whether tier 2 is really renderer-free.
+**D — actors.** The seam that decides whether Simulation is really renderer-free.
 10. Sprite-free actor type + registry (§4.6)
-11. Thinker base, mover, tangible, static, missile (§4.7)
+11. Thinker base, mover, tangible, static, missile, FPS control (§4.7)
+
+    Design the actor/sprite binding first: mansion's AI reaches for
+    `entity.sprite` nine times, so the answer has to be a mechanism, not a ban.
 
 **E — triggers and scheduling.**
 12. Tag grid (§4.8)
@@ -426,20 +600,32 @@ Ordered by dependency, and by what gets expensive to change later.
 14. Scheduler (§4.10)
 15. Save/restore across every subsystem (§4.13, §5)
 
-**F — tier 1 finish.** Independent of B-E; can be done any time.
-16. Decorative objects (§3.1)
-17. Sprite facing from camera angle (§3.2)
+**F — Rendering finish.** Independent of C-E; can be done any time.
+16. `blueprints` / `tilesets` merged into `LoadLevelOptions` (§3.1) — do first
+17. Decorative objects (§3.1)
+18. Sprite facing from camera angle (§3.2)
 
-### Totals if taken as recommended
+### Totals
+
+Phases A, B and C are done. Simulation stands at 1,770 lines — doors, door
+policy, secret passages, locks, save/restore, wall sliding, actor collision and
+the sector grid — with 1,234 lines of tests, two of them differential against
+the original. Core gained `CellMap`, `cells.ts` and `Vector`.
+
+What remains, if taken as recommended:
 
 | Tier | Lines | Note |
 |---|---|---|
-| 1 — new | ~140 | decorative objects, sprite facing |
-| 2 — new | ~2,400 | on top of 274 already ported |
-| 3 / out | ~1,140 | loop, player control, assets, canvas, misc |
+| Rendering — remaining | ~160 | decorative objects, the `extra` merge, sprite facing |
+| Simulation — remaining | ~1,780 | phases D, E |
+| Game / out | ~853 | loop, assets, canvas, events, camera, misc |
 | Separate package | 642 | filters |
 | Never | 1,529 | `Engine.js` as a class |
 
-The acceptance test for the whole thing: `games/mansion` runs on tiers 1 and 2
-with the game supplying only its loop, input and rules — and tier 2 alone runs
-a room in Node with no canvas.
+Simulation grew by 287 and Game shrank by the same, because
+`FPSControlThinker` moved in (§4.7).
+
+The acceptance test for the whole thing, now that no game is being ported:
+`demo/` grows to exercise each subsystem while `demo/main.ts` stays the only
+file touching the browser — and Simulation alone runs a room in Node with no
+canvas.

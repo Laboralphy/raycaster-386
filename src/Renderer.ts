@@ -7,7 +7,7 @@ import {
 } from './consts.js';
 import { context2d, createCanvas, getData, resize, setImageSmoothing, type ImageSource } from './core/canvas.js';
 import { MarkerRegistry } from './core/MarkerRegistry.js';
-import { CellMap } from './map/CellMap.js';
+import { CellMap } from './core/CellMap.js';
 import { CellSurfaceManager } from './map/CellSurfaceManager.js';
 import { LightMap } from './light/LightMap.js';
 import { LightSource } from './light/LightSource.js';
@@ -125,7 +125,7 @@ export class Renderer {
     private _smooth = false;
     private _stretch = false;
 
-    private _map = new CellMap();
+    private _map: CellMap;
     private _csm = new CellSurfaceManager();
     private _lightMap = new LightMap();
     private _cellCodes: CellCodes = [];
@@ -160,7 +160,13 @@ export class Renderer {
     private _context: RenderContext | null = null;
     private _dirty: number = Dirty.Screen | Dirty.Shading;
 
-    constructor() {
+    /**
+     * @param map the cell map to render. Pass one to share it with the
+     * simulation layer, which reads cell phys to decide what blocks movement;
+     * omit it and this renderer owns a private one.
+     */
+    constructor(map: CellMap = new CellMap()) {
+        this._map = map;
         this._offsetTop = (DEFAULT_SCREEN.width - DEFAULT_SCREEN.height) >>> 1;
     }
 
@@ -326,6 +332,19 @@ export class Renderer {
 
     getMapSize(): number {
         return this._map.size;
+    }
+
+    /**
+     * The cell map, so that code with no interest in rendering can read it.
+     *
+     * Reads are free. **Writes should go through this renderer** while one is
+     * attached: {@link setCellPhys} also re-traces the light map, and
+     * {@link setMapSize} resizes the surface and light buffers alongside the
+     * map. Writing to the map directly skips both. A headless caller with no
+     * renderer has neither buffer to keep in step and can write freely.
+     */
+    get cellMap(): CellMap {
+        return this._map;
     }
 
     /**

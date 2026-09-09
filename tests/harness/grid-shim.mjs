@@ -2,18 +2,42 @@
  * Stands in for `@laboralphy/grid`, which the original LightMap imports and
  * which is not installed in the engine checkout.
  *
- * The surface below is everything LightMap actually touches: the `width` and
- * `height` setters, `iterate` (whose return value initialises a cell), and
- * `cell`. Reconstructed from those call sites, not from the real package.
+ * The surface below is everything LightMap and SectorRegistry actually touch:
+ * the `width` and `height` setters, `iterate` (whose return value initialises a
+ * cell), `cell`, and `on('rebuild')`. Reconstructed from those call sites, not
+ * from the real package.
  *
- * It is only reachable for fixtures that declare light sources; with no
- * sources the grid is allocated and never read.
+ * `rebuild` fires once per cell whenever the grid is reallocated, with
+ * `{x, y, cell}`; whatever the handler assigns to `data.cell` becomes that
+ * cell. SectorRegistry uses it to fill the grid with Sector instances.
  */
 class Grid {
     constructor() {
         this._cells = [];
         this._width = 0;
         this._height = 0;
+        this._handlers = {};
+    }
+
+    on(event, handler) {
+        (this._handlers[event] ??= []).push(handler);
+        return this;
+    }
+
+    _emitRebuild() {
+        const handlers = this._handlers.rebuild;
+        if (handlers === undefined) {
+            return;
+        }
+        for (let y = 0; y < this._height; ++y) {
+            for (let x = 0; x < this._width; ++x) {
+                const data = { x, y, cell: undefined };
+                for (const h of handlers) {
+                    h(data);
+                }
+                this._cells[y * this._width + x] = data.cell;
+            }
+        }
     }
 
     get width() {
@@ -36,6 +60,7 @@ class Grid {
 
     _realloc() {
         this._cells = new Array(this._width * this._height).fill(undefined);
+        this._emitRebuild();
     }
 
     cell(x, y, value) {

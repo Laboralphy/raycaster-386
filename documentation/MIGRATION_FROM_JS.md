@@ -315,24 +315,25 @@ Three reasons, in order of weight:
    render system. Simulation writes, renderer reads.
 
 `Sprite` is the template already in place: the renderer owns the drawable, the
-engine owns the entity and writes position into it each frame. Doors work the
-same way — the renderer owns the cell's 8-bit offset, the engine owns the
+simulation owns the entity and writes position into it each frame. Doors work
+the same way — the renderer owns the cell's 8-bit offset, the simulation owns
+the
 phase and easing.
 
-## 8. The engine layer
+## 8. The simulation tier
 
-Ported as the first slice above the renderer, in `src/engine/`, built as a
-**separate bundle** (`dist/engine.js`, 4.7 kB minified) so a project that only
-needs rendering does not pull in door simulation. Nothing in `src/engine/`
+Ported as the first slice of Simulation, in `src/simulation/`, built as a
+**separate bundle** (`dist/simulation.js`, 4.7 kB minified) so a project that only
+needs rendering does not pull in door simulation. Nothing in `src/simulation/`
 imports the renderer.
 
 | Original | Port |
 |---|---|
-| `libs/easing/Easing.js` | `src/engine/Easing.ts` |
-| `libs/engine/DoorContext.js` | `src/engine/DoorContext.ts` |
-| `libs/engine/DoorManager.js` | `src/engine/DoorManager.ts` |
-| door constants from `libs/engine/consts` | `src/engine/consts.ts` |
-| `events` (npm) | `src/engine/TypedEmitter.ts` |
+| `libs/easing/Easing.js` | `src/simulation/Easing.ts` |
+| `libs/engine/DoorContext.js` | `src/simulation/DoorContext.ts` |
+| `libs/engine/DoorManager.js` | `src/simulation/DoorManager.ts` |
+| door constants from `libs/engine/consts` | `src/simulation/consts.ts` |
+| `events` (npm) | `src/simulation/TypedEmitter.ts` |
 
 `Easing` dispatched on strings that happened to be method names, via
 `this[name]`; curves are now plain functions in a lookup, which is what makes
@@ -350,7 +351,18 @@ for (const { x, y, offset, phys } of doorManager.process()) {
 }
 ```
 
-`tests/engine/doorIntegration.test.ts` drives a real door through a full
+`DoorPolicy` sits above both: it reads a cell's phys code to know a door is
+there, gives it the travel and timing that code implies — a double door opens
+half a cell, a curtain slides slower than a door — and owns the lock register
+and secret passages. What stands in a doorway is an `isCellOccupied` callback,
+so none of this needs an actor tier.
+
+`DoorManager` also restores a saved state: `setState(entries, build)` takes a
+factory for the contexts, because an entry records where a door is and how far
+through its cycle it got, but not the timings that follow from its cell's phys
+code — that is door policy, which this tier does not own yet.
+
+`tests/simulation/doorIntegration.test.ts` drives a real door through a full
 open-and-shut cycle and checks the picture changes on most sliding ticks, that
 the cell frees for movement only while open, that the frame returns exactly to
 the shut one, and that no neighbouring cell is disturbed.
@@ -426,7 +438,7 @@ not ported.** The split upstream is:
 
 The renderer can display a door in **any** state — the `doors` golden scene
 holds a half-open `PHYS_DOOR_UP` at offset 48 and a `PHYS_DOOR_LEFT` at
-offset 24, both pixel-verified. What *moves* one now lives in `src/engine/`
+offset 24, both pixel-verified. What *moves* one now lives in `src/simulation/`
 (§8), one layer up, per the decision in §7.
 
 The good news is that the coupling is tiny. All of `Engine`'s door handling
@@ -559,7 +571,35 @@ Tilesets are decoded lazily — only when a decal names one — so a sheet that
 only entities use costs nothing, and they are returned undecorated rather than
 pre-shaded, since what a game does with a sprite sheet is the game's business.
 
-## 12. Scope: three tiers, one arrow
+## 11b. Movement and collision
+
+Two independent pieces, both verified against the original rather than by
+inspection.
+
+**Wall sliding** (`wallCollider.ts`) probes four points around a mobile and
+cancels one axis at a time, so a diagonal into a wall keeps the component
+running along it. The probe on the trailing side is skipped — without that, a
+mobile straddling a door frame catches on the edge it has already passed and
+sticks in the doorway. `isSolid` is a callback over world coordinates, so the
+module knows nothing about maps.
+
+**Actor collision** (`Smasher`, `Dummy`, `ForceField`, `SectorRegistry`) moves
+nothing. Each overlapping pair contributes a force proportional to how deeply
+the two overlap, the resultant lands on `dummy.force`, and the caller decides
+what to do with it. Comparisons are limited to the nine sectors around each
+actor, so cost tracks local crowding rather than actor count. A `Dummy` carries
+a position, radius, tangibility masks and an opaque id — no sprite and no
+behaviour — which is the shape the actor tier needs.
+
+Both are pinned by differential tests. The collision one runs a 40-actor crowd
+for 25 ticks with each tick's force fed back into position, so any divergence
+compounds rather than cancelling; it matches the original exactly. Making that
+possible needed two harness additions: the grid shim gained the `rebuild` event
+`SectorRegistry` relies on, and `importLegacyBundle` bundles several original
+modules into a single module graph, without which their `instanceof` checks
+fail across separately-bundled copies.
+
+## 12. Scope: named tiers, one arrow
 
 The original grew into a framework: `Engine.js` alone is 1,529 lines and owns
 the game loop, asset loading, audio, the entity tier and the camera's AI. This
@@ -569,27 +609,30 @@ without a single line of `Engine`.
 
 | Tier | Owns | Never |
 |---|---|---|
-| **1. Renderer** — `raycaster-386` | Turning world state into pixels. | Time. Input. I/O. |
-| **2. Simulation** — `raycaster-386/engine` | Advancing world state by a tick. | Importing tier 1. Owning a loop. Touching the DOM. |
-| **3. Game** — the caller | The loop, input, rules, assets, audio, UI. | — |
+| **0. Core** — shared | Data both sides need: the cell map, grid, markers, geometry. | — |
+| **1. Rendering** — `raycaster-386` | Turning world state into pixels. | Time. Input. I/O. |
+| **2. Simulation** — `raycaster-386/simulation` | Advancing world state by a tick. | Importing Rendering. Owning a loop. Touching the DOM. |
+| **3. Game** — the caller, not shipped | The loop, input, rules, assets, audio, UI. | — |
 
-**The invariant is the arrow: tier 2 never imports tier 1.** A god object
+**The invariant is the arrow: Simulation never imports Rendering.** A god object
 exists precisely to hold both sides at once, so forbidding the import is what
 prevents one forming. §7 already states this for the door layer, and it is why
 `DoorManager.process()` returns cell updates as plain data rather than calling
 the renderer itself.
 
-Two consequences worth stating, because they are what the rule buys:
+Each tier is defined by what it *needs*: Core needs nothing, Rendering needs a
+screen, Simulation needs a clock, Game needs a player. Two consequences worth
+stating, because they are what the rule buys:
 
-**Golden-image tests exist because tier 1 is a pure function of world state.**
-Keep tier 2 equally pure — data in, deltas out — and it is unit-testable with
+**Golden-image tests exist because Rendering is a pure function of world
+state.** Keep Simulation equally pure — data in, deltas out — and it is unit-testable with
 no canvas, which is why `doorAnimation.test.ts` can drive a door from shut to
 open without rendering anything.
 
-**A headless server is the acceptance test.** If tier 2 can run a game room in
+**A headless server is the acceptance test.** If Simulation can run a game room in
 Node with no canvas — accepting input, ticking, emitting deltas — the
 separation is real. Time is already ticks rather than wall-clock, and
-`src/engine/` has zero DOM references today. The two things standing in the way
+`src/simulation/` has zero DOM references today. The two things standing in the way
 are that `CellMap` still lives inside `Renderer`, and that the no-DOM rule is a
 convention rather than a typecheck.
 

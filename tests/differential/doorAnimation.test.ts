@@ -6,7 +6,8 @@ import { compareFrames, isClean } from '../harness/compare.js';
 
 /**
  * The renderer draws a door at whatever offset a cell carries; nothing in this
- * package animates one. That job belongs to the engine's DoorContext, which
+ * package animates one. That job belongs to the simulation layer's DoorContext,
+ * which
  * upstream reaches the renderer through exactly two calls per door per tick:
  *
  *     rc.setCellOffset(x, y, offset);

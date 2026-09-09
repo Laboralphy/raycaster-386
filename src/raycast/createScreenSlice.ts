@@ -10,7 +10,7 @@ import {
     PHYS_DOOR_UP,
     PHYS_INVISIBLE_BLOCK
 } from '../consts.js';
-import { offsetOf, physOf } from '../map/CellMap.js';
+import { offsetOf, physOf } from '../core/CellMap.js';
 import type { ShadedTileSet } from '../texture/ShadedTileSet.js';
 import type { RenderContext } from './context.js';
 import type { Scene } from './Scene.js';

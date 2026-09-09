@@ -47,3 +47,35 @@ export async function importLegacy<T = unknown>(relPath: string): Promise<T> {
     });
     return (await import(`${outfile}?t=${Date.now()}`)) as T;
 }
+
+/**
+ * Bundles several original modules together and imports them as one.
+ *
+ * {@link importLegacy} bundles each entry point separately, so two calls give
+ * two copies of any class they share — and the original's `instanceof` checks
+ * then fail across them. This puts every named module in one module graph.
+ *
+ * @param modules export name to path, e.g. `{ Smasher: 'libs/smasher/Smasher.js' }`
+ */
+export async function importLegacyBundle<T = unknown>(
+    modules: Record<string, string>
+): Promise<T> {
+    const key = Object.values(modules).join('|').replace(/[\\/|.]/g, '_');
+    const outfile = resolve(outDir, `bundle_${key}.mjs`);
+    mkdirSync(dirname(outfile), { recursive: true });
+    const contents = Object.entries(modules)
+        .map(([name, p]) => `export { default as ${name} } from ${JSON.stringify(resolve(LEGACY_ROOT, p))};`)
+        .join('\n');
+    await esbuild.build({
+        stdin: { contents, resolveDir: LEGACY_ROOT, loader: 'js' },
+        bundle: true,
+        format: 'esm',
+        platform: 'node',
+        outfile,
+        alias: {
+            '@laboralphy/grid': resolve(here, 'grid-shim.mjs')
+        },
+        logLevel: 'silent'
+    });
+    return (await import(`${outfile}?t=${Date.now()}`)) as T;
+}

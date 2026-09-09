@@ -39,6 +39,11 @@ export interface DoorData {
     secret?: boolean;
     /** Closes itself after the maintain duration. */
     autoclose?: boolean;
+    /**
+     * The other half of a secret passage: a secret block pushes its neighbour
+     * along with it, and the neighbour is driven by its own context.
+     */
+    child?: DoorContext;
 }
 
 export interface DoorContextOptions {
@@ -208,7 +213,15 @@ export class DoorContext {
             this.initPhase(i as DoorPhase);
         }
         this._time = time;
-        this._easing.compute(time);
+        const y = this._easing.compute(time).y;
+        // The original computed the easing here and threw the result away, so
+        // a door restored mid-slide reported offset 0 until its next
+        // process(): reloading a save drew a half-open door shut for a frame.
+        // Only the sliding phases take their offset from the easing — OPEN and
+        // DONE set it in initPhase and must not be overwritten.
+        if (phase === DOOR_PHASE_OPENING || phase === DOOR_PHASE_CLOSING) {
+            this._offset = y;
+        }
     }
 
     get state(): DoorState {

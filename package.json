@@ -11,9 +11,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./engine": {
-      "types": "./dist/engine.d.ts",
-      "import": "./dist/engine.js"
+    "./simulation": {
+      "types": "./dist/simulation.d.ts",
+      "import": "./dist/simulation.js"
     },
     "./schema": {
       "types": "./dist/schema.d.ts",
@@ -27,7 +27,7 @@
     "build": "node scripts/build.mjs",
     "watch": "node scripts/build.mjs --watch",
     "types": "tsc -p tsconfig.json --emitDeclarationOnly --declaration --outDir dist",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.tests.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.simulation.json && tsc -p tsconfig.tests.json",
     "test": "vitest run",
     "check": "npm run typecheck && npm run test && npm run build",
     "test:watch": "vitest",

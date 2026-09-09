@@ -9,7 +9,10 @@ export type { RGBA } from './core/Rainbow.js';
 export * as Canvas from './core/canvas.js';
 export type { ImageSource, FilterColor } from './core/canvas.js';
 
-export { CellMap, materialOf, physOf, offsetOf } from './map/CellMap.js';
+export { CellMap, materialOf, physOf, offsetOf } from './core/CellMap.js';
+export { Vector } from './core/Vector.js';
+export { worldToCell, cellCenter, alterBlock } from './core/cells.js';
+export type { CellPos, WorldPos, CellChange } from './core/cells.js';
 export { CellSurfaceManager, isWallFace } from './map/CellSurfaceManager.js';
 export type { CellSurface } from './map/CellSurfaceManager.js';
 

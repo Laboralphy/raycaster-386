@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DoorContext, DoorManager } from '../../src/engine/index.js';
+import { DoorContext, DoorManager } from '../../src/simulation/index.js';
 import { PHYS_DOOR_UP, PHYS_NONE } from '../../src/consts.js';
 import type { Renderer } from '../../src/Renderer.js';
 import { SCENES } from '../harness/scenes.js';
@@ -10,7 +10,7 @@ import { compareFrames, isClean } from '../harness/compare.js';
  * The whole interface between door simulation and rendering.
  *
  * This is what a game loop would call each tick, and it is deliberately the
- * caller's job rather than either layer's: the engine never imports the
+ * caller's job rather than either layer's: the simulation never imports the
  * renderer, and the renderer never advances time.
  */
 function applyDoors(dm: DoorManager, rc: Renderer): void {

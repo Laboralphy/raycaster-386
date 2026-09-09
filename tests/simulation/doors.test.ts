@@ -3,7 +3,7 @@ import {
     DOOR_PHASE_CLOSED, DOOR_PHASE_CLOSING, DOOR_PHASE_OPEN, DOOR_PHASE_OPENING,
     DoorContext, DoorManager, Easing, EASING_FUNCTIONS,
     type DoorContextOptions
-} from '../../src/engine/index.js';
+} from '../../src/simulation/index.js';
 import { PHYS_DOOR_UP, PHYS_NONE } from '../../src/consts.js';
 
 function door(over: DoorContextOptions = {}): DoorContext {
@@ -248,5 +248,122 @@ describe('DoorManager', () => {
         expect(dm.state).toEqual([
             { phase: dc.getPhase(), time: dc.state.time, x: 3, y: 4, autoclose: true }
         ]);
+    });
+});
+
+describe('DoorManager save and restore', () => {
+    /** Rebuilds a door for a state entry, as door policy eventually will. */
+    const rebuild = (entry: { x: number; y: number; autoclose: boolean | undefined }) => {
+        const dc = door();
+        dc.data.x = entry.x;
+        dc.data.y = entry.y;
+        dc.data.autoclose = entry.autoclose;
+        return dc;
+    };
+
+    it('round-trips a door mid-slide, and both copies then tick alike', () => {
+        const dm = new DoorManager();
+        const dc = door();
+        dm.linkDoorContext(dc);
+        for (let i = 0; i < 4; ++i) {
+            dm.process();
+        }
+        expect(dc.getPhase()).toBe(DOOR_PHASE_OPENING);
+        expect(dc.offset).toBeGreaterThan(0);
+
+        const saved = JSON.parse(JSON.stringify(dm.state)) as typeof dm.state;
+        const restored = new DoorManager();
+        restored.setState(saved, rebuild);
+
+        const back = restored.doors[0];
+        expect(back, 'no door restored').toBeDefined();
+        expect(back.getPhase()).toBe(dc.getPhase());
+        expect(back.offset).toBe(dc.offset);
+        expect(back.data.x).toBe(3);
+        expect(back.data.y).toBe(4);
+
+        // And the two run identically from here on.
+        for (let i = 0; i < 30; ++i) {
+            expect(restored.process()).toEqual(dm.process());
+        }
+    });
+
+    it('restores several doors and drops whatever was live before', () => {
+        const dm = new DoorManager();
+        for (const [x, y] of [[1, 1], [2, 2], [5, 5]]) {
+            const dc = door();
+            dc.data.x = x;
+            dc.data.y = y;
+            dm.linkDoorContext(dc);
+        }
+        dm.process();
+        const saved = dm.state;
+
+        const other = new DoorManager();
+        other.linkDoorContext(door());
+        other.setState(saved, rebuild);
+
+        expect(other.doors.length).toBe(3);
+        expect(other.doors.map(d => [d.data.x, d.data.y])).toEqual([[1, 1], [2, 2], [5, 5]]);
+        // The door that was live before the restore is gone, not merged in.
+        expect(other.getDoorContext(3, 4)).toBeUndefined();
+    });
+
+    it('skips an entry the caller declines to rebuild', () => {
+        const dm = new DoorManager();
+        for (const [x, y] of [[1, 1], [2, 2]]) {
+            const dc = door();
+            dc.data.x = x;
+            dc.data.y = y;
+            dm.linkDoorContext(dc);
+        }
+        dm.process();
+
+        const restored = new DoorManager();
+        restored.setState(dm.state, e => (e.x === 1 ? null : rebuild(e)));
+        expect(restored.doors.map(d => d.data.x)).toEqual([2]);
+    });
+
+    it('carries autoclose across the round trip', () => {
+        const dm = new DoorManager();
+        const dc = door({ maintainDuration: 5 });
+        dc.data.autoclose = true;
+        dm.linkDoorContext(dc);
+        dm.process();
+
+        const restored = new DoorManager();
+        restored.setState(dm.state, rebuild);
+        expect(restored.doors[0].data.autoclose).toBe(true);
+    });
+
+    it('restores a door mid-close, not just mid-open', () => {
+        const dm = new DoorManager();
+        const dc = door({ maintainDuration: 1 });
+        dm.linkDoorContext(dc);
+        // Open fully, wait out the maintain, and catch it on the way down.
+        for (let i = 0; i < 14; ++i) {
+            dm.process();
+        }
+        expect(dc.getPhase()).toBe(DOOR_PHASE_CLOSING);
+        expect(dc.offset).toBeGreaterThan(0);
+        expect(dc.offset).toBeLessThan(96);
+
+        const restored = new DoorManager();
+        restored.setState(dm.state, rebuild);
+        expect(restored.doors[0].offset).toBe(dc.offset);
+    });
+
+    it('restores a fully open door at full travel', () => {
+        const dm = new DoorManager();
+        const dc = door({ maintainDuration: 50 });
+        dm.linkDoorContext(dc);
+        for (let i = 0; i < 12; ++i) {
+            dm.process();
+        }
+        expect(dc.getPhase()).toBe(DOOR_PHASE_OPEN);
+
+        const restored = new DoorManager();
+        restored.setState(dm.state, rebuild);
+        expect(restored.doors[0].offset).toBe(96);
     });
 });

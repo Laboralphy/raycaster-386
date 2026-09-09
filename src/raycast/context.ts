@@ -1,5 +1,5 @@
 import type { Face, WallFace } from '../consts.js';
-import type { CellMap } from '../map/CellMap.js';
+import type { CellMap } from '../core/CellMap.js';
 import type { CellSurfaceManager } from '../map/CellSurfaceManager.js';
 import type { ShadedTileSet } from '../texture/ShadedTileSet.js';
 import type { TileAnimation } from '../texture/TileAnimation.js';

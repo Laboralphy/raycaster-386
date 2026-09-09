@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CellMap, materialOf, offsetOf, physOf } from '../src/map/CellMap.js';
+import { CellMap, materialOf, offsetOf, physOf } from '../src/core/CellMap.js';
 import { PHYS_DOOR_DOUBLE, PHYS_TRANSPARENT_BLOCK } from '../src/consts.js';
 
 describe('CellMap', () => {

@@ -1,0 +1,12 @@
+{
+  /* The simulation tier must run headless — on a server with no canvas — so it
+     is type-checked without the DOM library. A `document` or HTMLCanvasElement
+     reference in src/simulation/ fails this build, which turns the tier rule
+     from a convention into a check. Files it imports are checked too, which is
+     what keeps src/core/ and src/consts.ts DOM-free as well. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"]
+  },
+  "include": ["src/simulation"]
+}

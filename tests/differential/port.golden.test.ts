@@ -223,6 +223,13 @@ describe('flat rasteriser', () => {
         // The two are only interchangeable because every operand is
         // non-negative there, which the surrounding bounds check guarantees.
         // This pins that equivalence so the duplicated loops cannot drift.
+        //
+        // Compared inline rather than through expect(): one assertion per
+        // iteration is ~400k of them, which put this test within a whisker of
+        // vitest's 5s default timeout and made it fail intermittently. The
+        // coverage is identical; only mismatches reach the assertion.
+        const mismatches: string[] = [];
+        let compared = 0;
         for (const ps of [2, 4, 8, 16, 32, 64, 128, 256]) {
             const psh = Math.log2(ps) | 0;
             const psm = ps - 1;
@@ -231,12 +238,22 @@ describe('flat rasteriser', () => {
                 // just under one, which is where the original went wrong.
                 const v = i * 0.37 * ps * 0.05 + (i % 7) * ps - Number.EPSILON * i;
                 if (v < 0) continue;
-                expect(v >> psh, `cell index, ps=${ps}, v=${v}`).toBe((v / ps) | 0);
-                expect(v & psm, `texel offset, ps=${ps}, v=${v}`).toBe((v % ps) | 0);
+                ++compared;
+                if ((v >> psh) !== ((v / ps) | 0)) {
+                    mismatches.push(`cell index, ps=${ps}, v=${v}`);
+                }
+                if ((v & psm) !== ((v % ps) | 0)) {
+                    mismatches.push(`texel offset, ps=${ps}, v=${v}`);
+                }
                 for (let layer = 0; layer < 8; ++layer) {
-                    expect((v & psm) + layer * ps).toBe(((v % ps) | 0) + layer * ps);
+                    if ((v & psm) + layer * ps !== ((v % ps) | 0) + layer * ps) {
+                        mismatches.push(`layer ${layer}, ps=${ps}, v=${v}`);
+                    }
                 }
             }
         }
+        expect(mismatches.slice(0, 5)).toEqual([]);
+        // Guard against the loop silently skipping everything.
+        expect(compared).toBeGreaterThan(30000);
     });
 });

@@ -5,7 +5,7 @@ import {
     PHYS_NONE,
     Renderer
 } from '../src/index.js';
-import { DoorContext, DoorManager } from '../src/engine/index.js';
+import { DoorContext, DoorManager } from '../src/simulation/index.js';
 import { LEVEL, METRICS, SHADING, START } from './level.js';
 
 /** How close the player must be to a door to open it, in world units. */
@@ -178,7 +178,7 @@ export class World {
      * Advances the world one tick.
      *
      * The door-to-renderer handoff is here, in the caller, rather than inside
-     * either layer: the engine never imports the renderer and the renderer
+     * either layer: the simulation never imports the renderer and the renderer
      * never advances time.
      */
     update(input: Input): void {
