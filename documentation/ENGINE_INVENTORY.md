@@ -167,7 +167,7 @@ setting theirs in `initPhase`.
 
 ## 3. Rendering
 
-### 3.1 Decorative objects — `take`, ~120 lines
+### 3.1 Decorative objects — **done**
 
 `loadLevel` currently returns a level's `objects` and `blueprints` under
 `unhandled`, so a mansion level renders its architecture, decals and lights,
@@ -218,12 +218,43 @@ objects can only resolve blueprints a level happens to carry inline.
 `startpoint` is already there. Small, but a prerequisite for phase F, not a
 nice-to-have.
 
-### 3.2 Sprite facing — `take`, ~20 lines
+**Done.** `LoadLevelOptions` takes `blueprints` and `tilesets`, appended to
+whatever the level declares and resolved with it, so a supplied entry's
+`@FX_LIGHT_SOURCE` resolves like the level's own. `buildObjects(rc, loaded,
+{ loadImage })` then turns objects into sprites — position, altitude from `z`,
+scale, effect flags, the tileset's named animations, and any light the
+blueprint carries. `thinker` and `size` are reported on each `PlacedObject`,
+never acted on.
+
+A separate call rather than a `loadLevel` flag, so a game with its own object
+handling does not pay for one it discards.
+
+Tested against the shipped mansion levels: every object placed, animations
+started, negative `z` sinking objects below the floor, and a blueprint supplied
+from outside the level surviving the merge and placing an object.
+
+The decal-alignment maths is now `decalOffset`, exported and pinned by a
+nine-case table read off the original's switch — it was the one part of this
+path rewritten rather than transcribed, and nothing had exercised it.
+
+### 3.2 Sprite facing — **done**
 
 `Horde.updateLookingAngle` (`Horde.js:67-86`) picks a sprite's directional
 frame from the camera angle. That is a sprite concern sitting inside the entity
 registry; `src/Sprite.ts` is already ported and `setDirection` is already there.
 Lift it alone, into Rendering, and leave `Horde` to §4.6.
+
+**Done:** `faceCamera(sprite, facing, cameraX, cameraY)` in
+`src/render/spriteFacing.ts`. It caches on the sprite — a new `Sprite.direction`
+getter — rather than on an entity, so it needs no actor tier, and it is a no-op
+when the frame would not change, which is what stops a walk cycle restarting
+every tick.
+
+Porting it exposed a typing bug: `Sprite.buildAnimation` declared its parameter
+as `TileAnimationDef & { start?: number | number[] }`, and the intersection
+collapsed `start` to `number` — so the array-of-starts form that declares a
+directional sprite, which the runtime has always handled, would not compile.
+Now `Omit<TileAnimationDef, 'start'> & …`.
 
 ---
 
@@ -621,14 +652,16 @@ Ordered by dependency, and by what gets expensive to change later.
 14. Scheduler (§4.10)
 15. Save/restore across every subsystem (§4.13, §5)
 
-**F — Rendering finish.** Independent of C-E; can be done any time.
-16. `blueprints` / `tilesets` merged into `LoadLevelOptions` (§3.1) — do first
-17. Decorative objects (§3.1)
-18. Sprite facing from camera angle (§3.2)
+**F — Rendering finish. Done.** Levels now load with their scenery.
+16. ~~`blueprints` / `tilesets` merged into `LoadLevelOptions`~~ (§3.1)
+17. ~~Decorative objects~~ (§3.1)
+18. ~~Sprite facing from camera angle~~ (§3.2)
 
 ### Totals
 
-Phases A, B and C are done. Simulation stands at 1,770 lines — doors, door
+Phases A, B, C and F are done. Rendering is complete: a saved level now loads
+with its architecture, decals, lights *and* its scenery. Simulation stands at
+1,770 lines — doors, door
 policy, secret passages, locks, save/restore, wall sliding, actor collision and
 the sector grid — with 1,234 lines of tests, two of them differential against
 the original. Core gained `CellMap`, `cells.ts` and `Vector`.
@@ -637,7 +670,7 @@ What remains, if taken as recommended:
 
 | Tier | Lines | Note |
 |---|---|---|
-| Rendering — remaining | ~160 | decorative objects, the `extra` merge, sprite facing |
+| Rendering — remaining | — | complete |
 | Simulation — remaining | ~1,780 | phases D, E |
 | Game / out | ~853 | loop, assets, canvas, events, camera, misc |
 | Separate package | 642 | filters |

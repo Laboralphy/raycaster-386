@@ -48,6 +48,7 @@ export { renderFlats, createFlatContext, resetFlatContext } from './render/rende
 export type { FlatContext } from './render/renderFlats.js';
 export { renderScreenSlice, renderScreenSliceBuffer } from './render/renderScreenSlice.js';
 export { renderSprite, renderSprites } from './render/renderSprites.js';
+export { faceCamera, SPRITE_DIRECTION_COUNT } from './render/spriteFacing.js';
 export { renderBackground } from './render/renderBackground.js';
 export { MapHelper } from './map/MapHelper.js';
 export type {
@@ -55,10 +56,13 @@ export type {
     BuiltMaterial, BlockLight, BuildResult
 } from './map/MapHelper.js';
 
-export { loadLevel, RCE_VERSION } from './level/loadLevel.js';
+export { buildObjects } from './level/buildObjects.js';
+export type { PlacedObject, BuildObjectsOptions } from './level/buildObjects.js';
+export { loadLevel, decalOffset, RCE_VERSION } from './level/loadLevel.js';
 export type { LoadLevelOptions, LoadedLevel } from './level/loadLevel.js';
 export { LEVEL_CONSTANTS, resolveConstant, resolveConstants } from './level/constants.js';
 export type {
     RceLevel, RceMetrics, RceTextures, RceShading, RceTileset,
-    RceLightSource, RceDecal, RceDecalFace, RceStartPoint, RceTag, DecalAlign
+    RceLightSource, RceDecal, RceDecalFace, RceStartPoint, RceTag, DecalAlign,
+    RceBlueprint, RceObject, RceObjectLight
 } from './level/types.js';

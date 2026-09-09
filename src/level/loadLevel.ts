@@ -4,7 +4,8 @@ import type { Face } from '../consts.js';
 import type { LightHandle, Renderer } from '../Renderer.js';
 import { resolveConstants } from './constants.js';
 import type {
-    DecalAlign, RceDecal, RceDecalFace, RceLevel, RceStartPoint, RceTag, RceTileset
+    DecalAlign, RceBlueprint, RceDecal, RceDecalFace, RceLevel, RceObject,
+    RceStartPoint, RceTag, RceTileset
 } from './types.js';
 
 /** The only level format version this loader accepts. */
@@ -35,8 +36,9 @@ export interface LoadedTileset {
  * lets a caller build its own entity tier on top without re-parsing the file.
  */
 export interface UnhandledSections {
-    blueprints: readonly unknown[];
-    objects: readonly unknown[];
+    /** Merged with any supplied through {@link LoadLevelOptions.blueprints}. */
+    blueprints: readonly RceBlueprint[];
+    objects: readonly RceObject[];
     tags: readonly RceTag[];
     camera: unknown;
 }
@@ -60,6 +62,19 @@ export interface LoadLevelOptions {
      */
     validate?: (data: unknown) => void;
 
+    /**
+     * Blueprints to merge into whatever the level declares.
+     *
+     * A game's bestiary is usually shared across levels and compiled at
+     * runtime, so it is never in the level file — upstream this was
+     * `Engine.buildLevel(data, extra)`. Supplied entries are appended, so a
+     * level can still carry its own.
+     */
+    blueprints?: readonly RceBlueprint[];
+
+    /** Tilesets to merge into whatever the level declares. See {@link blueprints}. */
+    tilesets?: readonly RceTileset[];
+
     /** Which start point to report. Defaults to the first. */
     startpoint?: number;
 
@@ -76,6 +91,11 @@ export interface LoadedLevel {
     lightsources: readonly LightHandle[];
     /** Only the tilesets a decal actually referenced, by id. */
     tilesets: ReadonlyMap<string | number, LoadedTileset>;
+    /**
+     * Every tileset declared, by id, including any supplied through the
+     * options. Undecoded — {@link buildObjects} draws on this.
+     */
+    declaredTilesets: ReadonlyMap<string | number, RceTileset>;
     /** The chosen start point, in cell coordinates, or null if none. */
     startpoint: RceStartPoint | null;
     /** Every start point the level declares. */
@@ -123,18 +143,29 @@ function toLevelMap(level: RceLevel['level']): LevelMap {
 }
 
 /**
- * Draws one tile of a tileset onto a surface, aligned within it.
+ * Where a decal tile sits within the surface it is painted on.
  *
  * `align` is a numpad code: 7 is the top-left corner, 5 the centre, 3 the
- * bottom-right. Column and row fall straight out of it.
+ * bottom-right. Column and row fall straight out of it, replacing the
+ * original's nine-case switch — exported so that equivalence can be tested
+ * rather than argued.
  */
+export function decalOffset(
+    align: DecalAlign, surfaceWidth: number, surfaceHeight: number,
+    tileWidth: number, tileHeight: number
+): { x: number; y: number } {
+    const xs = [0, (surfaceWidth - tileWidth) >> 1, surfaceWidth - tileWidth];
+    const ys = [0, (surfaceHeight - tileHeight) >> 1, surfaceHeight - tileHeight];
+    const column = (align - 1) % 3;
+    const row = 2 - (((align - 1) / 3) | 0);
+    return { x: xs[column], y: ys[row] };
+}
+
+/** Draws one tile of a tileset onto a surface, aligned within it. */
 function drawDecal(
     canvas: HTMLCanvasElement, ts: LoadedTileset, tile: number, align: DecalAlign
 ): void {
-    const xs = [0, (canvas.width - ts.width) >> 1, canvas.width - ts.width];
-    const ys = [0, (canvas.height - ts.height) >> 1, canvas.height - ts.height];
-    const column = (align - 1) % 3;
-    const row = 2 - (((align - 1) / 3) | 0);
+    const at = decalOffset(align, canvas.width, canvas.height, ts.width, ts.height);
     const context = canvas.getContext('2d');
     if (context === null) {
         throw new Error('loadLevel: could not get a 2d context to paint a decal');
@@ -142,7 +173,7 @@ function drawDecal(
     context.drawImage(
         ts.image,
         tile * ts.width, 0, ts.width, ts.height,
-        xs[column], ys[row], ts.width, ts.height
+        at.x, at.y, ts.width, ts.height
     );
 }
 
@@ -171,7 +202,13 @@ export async function loadLevel(
         throw new Error(`loadLevel: expected version ${RCE_VERSION}, got "${String(level.version)}"`);
     }
 
-    const data = resolveConstants(level);
+    // Caller-supplied blueprints and tilesets are appended before resolution,
+    // so their `@FX_*` symbols resolve like the level's own.
+    const data = resolveConstants({
+        ...level,
+        blueprints: [...(level.blueprints ?? []), ...(options.blueprints ?? [])],
+        tilesets: [...(level.tilesets ?? []), ...(options.tilesets ?? [])]
+    });
     const { metrics, textures } = data.level;
 
     renderer.setMetrics(metrics);
@@ -253,6 +290,7 @@ export async function loadLevel(
         blockLights,
         lightsources,
         tilesets,
+        declaredTilesets: declared,
         startpoint: startpoints[startpoint] ?? null,
         startpoints,
         unhandled: {

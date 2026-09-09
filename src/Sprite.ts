@@ -92,13 +92,16 @@ export class Sprite {
      * Adds an animation to a group. Passing an array of `start` indices adds
      * one animation per index, which is how a directional sprite is declared.
      */
-    buildAnimation(def: TileAnimationDef & { start?: number | number[] }, ref = 'default'): void {
+    buildAnimation(
+        def: Omit<TileAnimationDef, 'start'> & { start?: number | number[] },
+        ref = 'default'
+    ): void {
         const { start = 0 } = def;
         if (Array.isArray(start)) {
             start.forEach(s => this.buildAnimation({ ...def, start: s }, ref));
             return;
         }
-        const a = createTileAnimation({ ...def, start });
+        const a = createTileAnimation({ ...def, start: start as number });
         (this._animations[ref] ??= []).push(a);
         if (this._animation === null) {
             this._animation = a;
@@ -160,6 +163,11 @@ export class Sprite {
             a.loopDir = loopDir;
             this._currentDir = direction;
         }
+    }
+
+    /** Which facing of the current animation group is showing. */
+    get direction(): number {
+        return this._currentDir;
     }
 
     setTileSet(ts: ShadedTileSet | null): void {

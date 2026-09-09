@@ -131,6 +131,51 @@ export interface RceStartPoint {
     angle: number;
 }
 
+/** A light an object carries with it. */
+export interface RceObjectLight {
+    r0: number;
+    r1: number;
+    v: number;
+}
+
+/**
+ * A template an object is built from: which tileset draws it, how big it is,
+ * and what it does.
+ *
+ * A game's shared bestiary usually lives outside the level files, so these may
+ * be supplied through {@link LoadLevelOptions.blueprints} instead.
+ */
+export interface RceBlueprint {
+    id: string | number;
+    tileset: string | number;
+    /** Named behaviour, for the caller's actor tier. Not interpreted here. */
+    thinker?: string;
+    /** Collision radius. Reported, never acted on by this library. */
+    size?: number;
+    ref?: string;
+    /** FX_* flags, as symbols or values. */
+    fx?: readonly ConstantRef[];
+    /** Larger shrinks the sprite. */
+    scale?: number;
+    lightsource?: RceObjectLight | null;
+    /** Free-form payload carried through to the caller. */
+    data?: Record<string, unknown>;
+}
+
+/** One placed object: where it stands, and the blueprint it is built from. */
+export interface RceObject {
+    /** World coordinates, in texels. */
+    x: number;
+    y: number;
+    /** Altitude above the floor; negative sinks it in. */
+    z?: number;
+    /** Facing, in radians. */
+    angle?: number;
+    blueprint: string | number;
+    /** Which of the tileset's animations to start in. */
+    animation?: string | null;
+}
+
 /** Tags attached to a cell. Meaningless to the renderer; reported as-is. */
 export interface RceTag {
     x: number;
@@ -153,8 +198,8 @@ export interface RceLevel {
     decals?: readonly RceDecal[];
     lightsources?: readonly RceLightSource[];
     startpoints?: readonly RceStartPoint[];
-    blueprints?: readonly unknown[];
-    objects?: readonly unknown[];
+    blueprints?: readonly RceBlueprint[];
+    objects?: readonly RceObject[];
     tags?: readonly RceTag[];
     camera?: unknown;
     /** A thumbnail the editor stores. Ignored. */

@@ -28,6 +28,7 @@ npm run build      # dist/index.js + dist/simulation.js
 | 6 | Engine layer: doors + easing | done |
 | 7 | Renderer-level demo | done |
 | 8 | RCE-100 level loading | done |
+| 9 | Simulation: doors, collision, movement | in progress |
 
 `libs/raycaster` is fully ported, plus the first slice of the simulation tier
 (doors and easing) and a loader for the map editor's saved format. The port
@@ -44,6 +45,9 @@ from forming, and what would let the simulation run headless on a server. See
 §12 of the migration doc, and
 [documentation/ENGINE_INVENTORY.md](documentation/ENGINE_INVENTORY.md) for what
 is in scope, what is not, and in what order.
+
+Where the migration stands, and what to pick up next, is in
+[documentation/PROGRESS.md](documentation/PROGRESS.md).
 
 Migration progress, decisions and known gaps are recorded in
 [documentation/MIGRATION_FROM_JS.md](documentation/MIGRATION_FROM_JS.md), and
@@ -124,6 +128,7 @@ src/
     types.ts              the saved format, as written by the map editor
     constants.ts          "@PHYS_WALL" and friends, resolved strictly
     loadLevel.ts          builds a renderer; reports what it does not handle
+    buildObjects.ts       turns a level's objects into placed sprites
     rce-100.json          the format schema, shipped unmodified on its own entry point
   simulation/             world state advanced by a tick; separate bundle
     DoorPolicy.ts         which cells are doors, and opening, closing, locking them
