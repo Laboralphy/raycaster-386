@@ -5,5 +5,5 @@
        engine off disk and bundles it. The library itself never sees these. */
     "types": ["node"]
   },
-  "include": ["src", "tests", "demo", "vitest.bench.config.ts"]
+  "include": ["src", "tests", "demos", "vitest.bench.config.ts"]
 }

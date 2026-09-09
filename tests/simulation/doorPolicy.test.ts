@@ -257,6 +257,47 @@ describe('DoorPolicy secret passages', () => {
     });
 });
 
+describe('DoorPolicy with a door next to a secret passage', () => {
+    /** A normal door at (2,2), and a secret passage at (2,3)-(2,4) beside it. */
+    const adjacent = () => mapWith(8, [
+        [2, 2, PHYS_DOOR_UP],
+        [2, 3, PHYS_SECRET_BLOCK],
+        [2, 4, PHYS_SECRET_BLOCK]
+    ]);
+
+    it('reports the door closing, not its secret neighbour', () => {
+        const dp = policy(adjacent());
+        dp.openDoor(2, 3);              // the passage, which never autocloses
+        const seen: string[] = [];
+        dp.events.on('closing', e => seen.push(`closing ${e.x},${e.y}`));
+        dp.events.on('closed', e => seen.push(`closed ${e.x},${e.y}`));
+
+        dp.openDoor(2, 2, true);
+        for (let i = 0; i < 1000; ++i) {
+            dp.process();
+        }
+        expect(seen).toEqual(['closing 2,2', 'closed 2,2']);
+    });
+
+    it('closes the door itself rather than the passage beside it', () => {
+        const dp = policy(adjacent());
+        dp.openDoor(2, 3);
+        dp.openDoor(2, 2, false);
+        for (let i = 0; i < 200; ++i) {
+            dp.process();
+        }
+        expect(dp.isDoorOpen(2, 2)).toBe(true);
+
+        dp.closeDoor(2, 2);
+        for (let i = 0; i < 200; ++i) {
+            dp.process();
+        }
+        expect(dp.doors.getDoorContext(2, 2), 'the door did not close').toBeUndefined();
+        // The passage is untouched: it was never asked to close.
+        expect(dp.doors.getDoorContext(2, 3), 'the passage was closed instead').toBeDefined();
+    });
+});
+
 describe('DoorPolicy save and restore', () => {
     it('round-trips a door mid-slide', () => {
         const map = mapWith(8, [[2, 2, PHYS_DOOR_UP]]);

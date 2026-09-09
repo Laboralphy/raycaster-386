@@ -2,15 +2,15 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
-import { World, emptyInput } from '../../demo/world.js';
-import { PHYS_NONE } from '../../src/index.js';
-import { installDom } from '../harness/dom.js';
-import { compareFrames, isClean } from '../harness/compare.js';
-import type { Frame } from '../harness/legacyRenderer.js';
+import { World, emptyInput } from '../../../demos/simple/world.js';
+import { PHYS_NONE } from '../../../src/index.js';
+import { installDom } from '../../harness/dom.js';
+import { compareFrames, isClean } from '../../harness/compare.js';
+import type { Frame } from '../../harness/legacyRenderer.js';
 
 /** Decodes one of the demo's real PNG assets into a canvas. */
 async function asset(name: string): Promise<HTMLCanvasElement> {
-    const image = await loadImage(readFileSync(resolve(__dirname, '../../demo/assets', name)));
+    const image = await loadImage(readFileSync(resolve(__dirname, '../../../demos/simple/assets', name)));
     const canvas = createCanvas(image.width, image.height);
     canvas.getContext('2d').drawImage(image, 0, 0);
     return canvas as unknown as HTMLCanvasElement;
@@ -121,14 +121,14 @@ describe('demo world', () => {
 
         const shut = grab(w);
         expect(w.openAimedDoor()).toBe(true);
-        expect(w.doors.doors.length).toBe(1);
+        expect(w.doors.contexts.length).toBe(1);
 
         // Let it slide, holding still. The first tick is spent leaving the
         // CLOSED phase, so the door is open one tick after the slide ends.
         const idle = emptyInput();
         let changed = 0;
         let previous = shut;
-        const dc = w.doors.doors[0];
+        const dc = w.doors.contexts[0];
         for (let i = 0; i < 60 && !dc.isOpen(); ++i) {
             w.update(idle);
             w.render();
@@ -156,7 +156,7 @@ describe('demo world', () => {
         const w = atDoor();
         expect(w.openAimedDoor()).toBe(true);
         expect(w.openAimedDoor()).toBe(false);
-        expect(w.doors.doors.length).toBe(1);
+        expect(w.doors.contexts.length).toBe(1);
     });
 
     it('will not close a door on the player standing in it', () => {
@@ -169,7 +169,7 @@ describe('demo world', () => {
         w.player.x = 2.5 * 64;
         w.player.y = 2.5 * 64;
         for (let i = 0; i < 400; ++i) w.update(idle);
-        expect(w.doors.doors.length, 'the door retired while occupied').toBe(1);
+        expect(w.doors.contexts.length, 'the door retired while occupied').toBe(1);
         expect(w.renderer.getCellPhys(2, 2)).toBe(PHYS_NONE);
     });
 });

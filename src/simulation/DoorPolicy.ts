@@ -2,7 +2,7 @@ import {
     PHYS_CURT_DOWN, PHYS_CURT_UP, PHYS_DOOR_DOUBLE, PHYS_DOOR_DOWN, PHYS_DOOR_LEFT,
     PHYS_DOOR_RIGHT, PHYS_DOOR_UP, PHYS_FIRST_DOOR, PHYS_LAST_DOOR, PHYS_SECRET_BLOCK
 } from '../consts.js';
-import type { CellMap } from '../core/CellMap.js';
+import type { ReadonlyCellMap } from '../core/CellMap.js';
 import { MarkerRegistry } from '../core/MarkerRegistry.js';
 import { DOOR_MAINTAIN_DURATION, DOOR_SLIDING_DURATION } from './consts.js';
 import { DoorContext, type DoorCloseCheck } from './DoorContext.js';
@@ -18,7 +18,7 @@ export interface DoorMetrics {
 
 export interface DoorPolicyOptions {
     /** The map whose phys codes say which cells are doors. */
-    map: CellMap;
+    map: ReadonlyCellMap;
     metrics: DoorMetrics;
     /**
      * True if something stands in this cell, which stops a door closing on it.
@@ -62,7 +62,7 @@ export class DoorPolicy {
     readonly doors = new DoorManager();
     readonly events = new TypedEmitter<DoorPolicyEvents>();
 
-    private readonly _map: CellMap;
+    private readonly _map: ReadonlyCellMap;
     private readonly _metrics: DoorMetrics;
     private readonly _occupied: (x: number, y: number) => boolean;
     private readonly _slidingDuration: number;
@@ -81,6 +81,11 @@ export class DoorPolicy {
         this._occupied = isCellOccupied;
         this._slidingDuration = slidingDuration;
         this._maintainDuration = maintainDuration;
+    }
+
+    /** Every door currently live, in registration order. */
+    get contexts(): readonly DoorContext[] {
+        return this.doors.doors;
     }
 
     /** Cells currently locked. Serialisable alongside {@link state}. */
@@ -171,7 +176,7 @@ export class DoorPolicy {
         this.events.emit('opened', { x, y, context: dc });
         // A secret passage reports closing from its trailing half, which is the
         // one still moving when the pair finishes.
-        const child = this.secretNeighborContext(x, y);
+        const child = this.secretNeighborContext(dc);
         (child ?? dc).events.once('closing', () => this.events.emit('closing', { x, y }));
         dc.events.once('close', () => this.events.emit('closed', { x, y }));
         return dc;
@@ -189,7 +194,7 @@ export class DoorPolicy {
         if (dc === undefined) {
             return;
         }
-        const child = this.secretNeighborContext(x, y);
+        const child = this.secretNeighborContext(dc);
         if (child !== null) {
             // The pair closes in reverse: the pushed block returns first.
             child.events.once('close', () => dc.close());
@@ -343,15 +348,27 @@ export class DoorPolicy {
         return dc1;
     }
 
-    /** The secret half adjacent to a cell, if its passage has one. */
-    private secretNeighborContext(x: number, y: number): DoorContext | null {
-        let child: DoorContext | null = null;
+    /**
+     * The other half of `dc`'s secret passage, if it has one.
+     *
+     * Only a secret block has one. The original asked this of every door and
+     * accepted any adjacent secret context, so an ordinary door standing beside
+     * an open secret passage adopted it: the door's `closing` event fired from
+     * the passage — which never autocloses, so in practice never — and
+     * `closeDoor` shut the passage instead of the door.
+     */
+    private secretNeighborContext(dc: DoorContext): DoorContext | null {
+        if (dc.data.secret !== true) {
+            return null;
+        }
+        const { x, y } = dc.data;
+        let sibling: DoorContext | null = null;
         forEachNeighbor(this._map, x, y, (cx, cy) => {
-            const dc = this.doors.getDoorContext(cx, cy);
-            if (dc !== undefined && dc.data.secret === true) {
-                child = dc;
+            const neighbor = this.doors.getDoorContext(cx, cy);
+            if (neighbor !== undefined && neighbor.data.secret === true) {
+                sibling = neighbor;
             }
         }, CELL_NEIGHBOR_SIDE);
-        return child;
+        return sibling;
     }
 }

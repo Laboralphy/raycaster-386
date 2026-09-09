@@ -1,4 +1,4 @@
-import type { CellMap } from '../core/CellMap.js';
+import type { ReadonlyCellMap } from '../core/CellMap.js';
 
 /** Cells sharing an edge with the subject. */
 export const CELL_NEIGHBOR_SIDE = 1;
@@ -18,7 +18,7 @@ export const CELL_NEIGHBOR_SELF = 4;
  * passage to an unrelated block on the far edge of the map.
  */
 export function forEachNeighbor(
-    map: CellMap,
+    map: ReadonlyCellMap,
     x: number,
     y: number,
     visit: (x: number, y: number, phys: number) => void,

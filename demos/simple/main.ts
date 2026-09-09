@@ -1,4 +1,4 @@
-import { Canvas } from '../src/index.js';
+import { Canvas } from '../../src/index.js';
 import { TEXTURES } from './level.js';
 import { emptyInput, World, type Input } from './world.js';
 
@@ -16,12 +16,12 @@ let usePressed = false;
 
 function readInput(): Input {
     const input = emptyInput();
-    if (held.has('w') || held.has('arrowup')) input.forward += 1;
-    if (held.has('s') || held.has('arrowdown')) input.forward -= 1;
-    if (held.has('a')) input.strafe -= 1;
-    if (held.has('d')) input.strafe += 1;
-    if (held.has('arrowleft')) input.turn -= 1;
-    if (held.has('arrowright')) input.turn += 1;
+    if (held.has('w') || held.has('arrowup')) {input.forward += 1;}
+    if (held.has('s') || held.has('arrowdown')) {input.forward -= 1;}
+    if (held.has('a')) {input.strafe -= 1;}
+    if (held.has('d')) {input.strafe += 1;}
+    if (held.has('arrowleft')) {input.turn -= 1;}
+    if (held.has('arrowright')) {input.turn += 1;}
     // Mouse look is applied as a one-off rotation, not a rate.
     input.turn += mouseTurn / 0.045;
     mouseTurn = 0;
@@ -36,7 +36,7 @@ function hud(world: World, fps: number): string {
     return [
         `${fps.toFixed(0)} fps`,
         `cell ${c.x},${c.y}`,
-        `doors ${world.doors.doors.length}`,
+        `doors ${world.doors.contexts.length}`,
         door ? `[E] open door at ${door.x},${door.y}` : ''
     ]
         .filter(Boolean)
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
             usePressed = true;
             e.preventDefault();
         }
-        if (key.startsWith('arrow')) e.preventDefault();
+        if (key.startsWith('arrow')) {e.preventDefault();}
     });
     window.addEventListener('keyup', e => held.delete(e.key.toLowerCase()));
     window.addEventListener('blur', () => held.clear());

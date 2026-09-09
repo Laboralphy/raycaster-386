@@ -10,7 +10,7 @@ verified pixel-for-pixel against the original.
 ```bash
 npm install
 npm run check      # typecheck + test + build
-npm run demo       # playable demo on http://localhost:8080
+npm run demo       # playable demo on http://localhost:8080 (demos/simple)
 npm run bench      # port vs the original engine
 npm run build      # dist/index.js + dist/simulation.js
 ```
@@ -205,6 +205,22 @@ instances and across repeated frames. It was validated end to end by
 injecting a one-character off-by-one into the original's `projectRay`, which
 it caught as a 26% pixel difference with a bounding box.
 
+### A bug this port introduced, and fixed
+
+`CellMap` packs the map into a flat `Uint32Array` indexed `y * size + x`,
+because `projectRay` reads one cell per DDA step and one indexed load beats two
+dependent ones. The original stored an array of arrays, where `this._map[y][x]`
+with an out-of-range `y` threw a TypeError — loud and immediate.
+
+Flattening turned that into a silent fault. Reads off the map returned phys 0,
+which means *walkable*; and because `(-1, 1)` computes to a valid index in the
+row above, `setOffset(-1, 1, v)` really wrote — to the wrong cell, touching only
+the offset bits, so nothing looked broken. Every accessor is now bounds-checked:
+outside the map reads as solid, and writes there are dropped rather than
+wrapped. The hot loops read the backing store directly and never went through
+the accessors, so the check is free where it would have mattered — measured
+across repeated benchmark runs, the difference is below the noise floor.
+
 ### Bugs fixed in the port
 
 Three, all found by the harness rather than by reading:
@@ -246,6 +262,12 @@ Two more surfaced later:
   `oDoor.isDoorOpen(x, y)`, which `DoorContext` does not define, so every cell
   that had a door context raised a TypeError. Dead code upstream, since nothing
   reachable called it; ported as `dc.isOpen()`.
+- **An ordinary door beside an open secret passage adopted it.** The lookup for
+  a secret passage's other half accepted any adjacent secret context without
+  first asking whether the door itself was part of a passage. So a door next to
+  a live secret block reported its `closing` event from that block — which never
+  autocloses, so the event never arrived — and closing the door shut the passage
+  instead. The lookup now returns nothing unless the subject is itself secret.
 - **A secret passage could pair with a block on the far edge of the map.** The
   neighbour walk read `getCellPhys(-1, y)`, and `CellMap` indexes a flat array
   with no bounds check, so that is the last cell of the row above. The port's

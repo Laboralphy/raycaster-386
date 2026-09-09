@@ -6,7 +6,7 @@ dist/
 
 .bench/
 .prof/
-demo/dist/
+demos/*/dist/
 .shots/
 
 .idea

@@ -3,7 +3,6 @@ import { Dummy } from '../../src/simulation/Dummy.js';
 import { Smasher, type SmashingEntity } from '../../src/simulation/Smasher.js';
 import { hasLegacy, importLegacyBundle } from '../harness/legacy.js';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 interface LegacyBundle {
     Smasher: new () => any;
     Dummy: new () => any;
@@ -114,12 +113,12 @@ describe.skipIf(!hasLegacy)('Smasher vs original', () => {
         const theirs = buildLegacy(bundle);
         // Make every third actor intangible, and every fourth blind to others.
         mine.entities.forEach((e, i) => {
-            if (i % 3 === 0) e.dummy.tangibility.self = 0;
-            if (i % 4 === 0) e.dummy.tangibility.hitmask = 0;
+            if (i % 3 === 0) {e.dummy.tangibility.self = 0;}
+            if (i % 4 === 0) {e.dummy.tangibility.hitmask = 0;}
         });
         theirs.entities.forEach((e, i) => {
-            if (i % 3 === 0) e.dummy.tangibility.self = 0;
-            if (i % 4 === 0) e.dummy.tangibility.hitmask = 0;
+            if (i % 3 === 0) {e.dummy.tangibility.self = 0;}
+            if (i % 4 === 0) {e.dummy.tangibility.hitmask = 0;}
         });
 
         mine.smasher.process();

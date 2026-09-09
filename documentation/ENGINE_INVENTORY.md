@@ -33,9 +33,9 @@ document applies it to everything else.
 **The acceptance test is a headless server.** If Simulation can run a game room in
 Node with no canvas — accepting input, ticking, and emitting deltas — the
 separation is real. If it cannot, something has been put in the wrong tier.
-See §5. Alongside it, `demo/` is the Tier-3 exemplar: `demo/world.ts` holds a
-whole simulation and knows nothing about the DOM, `demo/main.ts` is the only
-file that touches the browser, and `tests/demo/world.test.ts` already runs the
+See §5. Alongside it, `demos/` is the Tier-3 exemplar: `demos/simple/world.ts` holds a
+whole simulation and knows nothing about the DOM, `demos/simple/main.ts` is the only
+file that touches the browser, and `tests/demos/simple/world.test.ts` already runs the
 lot headlessly. Growing it to exercise each new subsystem is what shows the
 library is usable from outside.
 
@@ -100,12 +100,26 @@ share one map between tiers and a server can hold one with no renderer at all.
 The `CELL_*` masks stayed in `src/consts.ts`, which is already DOM-free and
 shared; splitting that module is a separate, optional tidy-up.
 
-One rule came out of it, documented on the accessor: **reads are free, writes go
-through the renderer while one is attached.** `setCellPhys` also re-traces the
-light map and `setMapSize` resizes the surface and light buffers, so writing to
-the shared map directly skips both. That is not a new constraint — it is why
-`DoorManager.process()` already returns deltas for the caller to apply rather
-than mutating anything itself.
+One rule came out of it: **reads are free, writes go through the renderer while
+one is attached.** `setCellPhys` also re-traces the light map and `setMapSize`
+resizes the surface and light buffers, so writing to the shared map directly
+skips both. That is not a new constraint — it is why `DoorManager.process()`
+already returns deltas for the caller to apply rather than mutating anything
+itself.
+
+That rule is now enforced by type rather than documented: `Renderer.cellMap`
+returns a `ReadonlyCellMap` view — the same object, through an interface with
+no setters and no `data`, erased at build time so it copies nothing and costs
+nothing. Verified by writing through it: `setPhys` and `data` are both
+rejected, and neither name appears in the emitted bundles. Whoever constructed
+the map keeps the writable `CellMap`; a headless caller with no renderer has no
+buffers to keep in step and writes freely.
+
+`CellMap` is also bounds-checked now, which it was not when it was extracted —
+see the note in the README's bug list. That defect was introduced by this port
+rather than inherited: the original stored the map as an array of arrays, where
+`this._map[y][x]` with a bad `y` threw a TypeError, and flattening it to a
+`Uint32Array` for speed turned a loud failure into a silent one.
 
 ### 2.2 Enforce the no-DOM rule — **done**
 
@@ -228,7 +242,9 @@ canvas. Roughly **2,400 lines** on top of the 274 already ported.
 `DoorContext` animates a door; this decides which cells *are* doors, builds a
 context from a cell's phys code, and handles autoclose, locking and refusing to
 close on whatever stands in the doorway. Without it, opening a door means
-writing the policy yourself, as `demo/world.ts` does.
+writing the policy yourself, which `demos/simple/world.ts` used to do and no
+longer does: it now constructs a `DoorPolicy` and supplies only the game's own
+decision, that a door must not close on the player.
 
 The missing half of something already ported, and it closes §2.3.
 
@@ -259,7 +275,12 @@ the recessed-wall geometry it relies on (`projectRay.sameOffsetWall`) is
 already ported and golden-tested.
 
 **Done:** inside `DoorPolicy`, with the neighbour walk in
-`src/simulation/neighbors.ts`. A third inherited bug came out of it: **the
+`src/simulation/neighbors.ts`. A second defect here: the lookup for a passage's
+other half accepted any adjacent secret context, so **an ordinary door beside an
+open secret passage adopted it** — its `closing` event fired from the passage
+(which never autocloses, so never) and `closeDoor` shut the passage instead of
+the door. The lookup now returns nothing unless the subject door is itself
+secret. A third inherited bug came out of it: **the
 neighbour walk could pair a block with one on the opposite map edge.**
 `CellMap` indexes a flat array with no bounds check, so `getPhys(-1, y)` reads
 the last cell of the row above. `forEachNeighbor` now skips cells outside the
@@ -296,8 +317,8 @@ Two notes on what changed:
 `libs/wall-collider`. Slides a circle along walls instead of letting it stick.
 
 **Zero imports** — the only file in this inventory with no dependencies at all,
-and the cheapest thing here to port. `demo/world.ts` already hand-rolls a
-version of it off `getCellPhys`.
+and the cheapest thing here to port. `demos/simple/world.ts` used to hand-roll a
+version of it off `getCellPhys`; it now calls this one.
 
 **Done:** `src/simulation/wallCollider.ts`. `isSolid` is a callback taking a
 world position, so it knows nothing about the map and a caller can answer from
@@ -626,6 +647,6 @@ Simulation grew by 287 and Game shrank by the same, because
 `FPSControlThinker` moved in (§4.7).
 
 The acceptance test for the whole thing, now that no game is being ported:
-`demo/` grows to exercise each subsystem while `demo/main.ts` stays the only
-file touching the browser — and Simulation alone runs a room in Node with no
+each demo under `demos/` grows to exercise the subsystems it needs while its
+`main.ts` stays the only file touching the browser — and Simulation alone runs a room in Node with no
 canvas.

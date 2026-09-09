@@ -473,11 +473,14 @@ animation can be lifted out of `libs/engine` on its own, without dragging in
 
 ## 10. The demo
 
-`demo/` is a browser demo driving the port directly — no `Engine`.
+`demos/` holds browser demos driving the port directly — no `Engine`. Each is
+a directory with its own `index.html` and `main.ts`, so one can be rewritten
+without disturbing the others.
 
 ```bash
-npm run demo          # builds and serves on http://localhost:8080
-npm run demo:watch    # rebuilds on change
+npm run demo             # builds and serves demos/simple
+npm run demo -- lights   # any other directory under demos/
+npm run demo:watch       # rebuilds on change
 ```
 
 It uses the original engine's `tagged-level` map and its actual `walls.png`
@@ -494,9 +497,9 @@ What it demonstrates end to end:
 - A `DoorContext` opening on demand, animating, and refusing to close on the
   player — with the two-call handoff from §8 in the game loop
 
-`demo/world.ts` holds the whole simulation and knows nothing about the DOM;
-`demo/main.ts` is the only part that touches the browser. That split is what
-lets `tests/demo/world.test.ts` run the entire demo headlessly against the
+`demos/simple/world.ts` holds the whole simulation and knows nothing about the
+DOM; `demos/simple/main.ts` is the only part that touches the browser. That
+split is what lets `tests/demos/simple/world.test.ts` run it headlessly against the
 real PNGs: building the level, walking into walls, aiming at the door, opening
 it, watching it animate, and walking through.
 
@@ -508,7 +511,7 @@ wraps the map in `level: { metrics, textures, map, legend }` alongside
 and writes phys codes as `"@PHYS_WALL"` strings resolved by a translator at
 load time. `MapHelper` handles only the legend and grid; everything else is
 `Engine.buildLevel()`. The demo therefore declares its level with the
-constants referenced directly — see `demo/level.ts`.
+constants referenced directly — see `demos/simple/level.ts`.
 
 ## 11. The level loader
 
@@ -518,7 +521,7 @@ constants referenced directly — see `demo/level.ts`.
 **RCE-100 is an importer, not the native shape.** `toLevelMap()` projects the
 file's `level` section onto `LevelMap`, the structure `MapHelper` already took.
 It is written out field by field rather than cast, so the two can diverge: a
-level declared in code (`demo/level.ts`) never touches the RCE types, and a
+level declared in code (`demos/simple/level.ts`) never touches the RCE types, and a
 second input format would be a second importer rather than a change here.
 
 **Symbols resolve strictly.** A saved level writes `"@PHYS_WALL"` rather than

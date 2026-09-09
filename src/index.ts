@@ -10,6 +10,7 @@ export * as Canvas from './core/canvas.js';
 export type { ImageSource, FilterColor } from './core/canvas.js';
 
 export { CellMap, materialOf, physOf, offsetOf } from './core/CellMap.js';
+export type { ReadonlyCellMap } from './core/CellMap.js';
 export { Vector } from './core/Vector.js';
 export { worldToCell, cellCenter, alterBlock } from './core/cells.js';
 export type { CellPos, WorldPos, CellChange } from './core/cells.js';

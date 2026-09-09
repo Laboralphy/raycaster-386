@@ -1,11 +1,5 @@
-import {
-    MapHelper,
-    PHYS_FIRST_DOOR,
-    PHYS_LAST_DOOR,
-    PHYS_NONE,
-    Renderer
-} from '../src/index.js';
-import { DoorContext, DoorManager } from '../src/simulation/index.js';
+import { MapHelper, PHYS_NONE, Renderer, worldToCell } from '../../src/index.js';
+import { computeWallCollisions, DoorPolicy } from '../../src/simulation/index.js';
 import { LEVEL, METRICS, SHADING, START } from './level.js';
 
 /** How close the player must be to a door to open it, in world units. */
@@ -16,6 +10,8 @@ const WALK_SPEED = 3.2;
 const TURN_SPEED = 0.045;
 /** Keeps the player off the walls, in world units. */
 const PLAYER_RADIUS = 12;
+/** How long an opened door waits before closing itself, in ticks. */
+const DOOR_MAINTAIN = 180;
 
 export interface Player {
     x: number;
@@ -38,14 +34,18 @@ export function emptyInput(): Input {
 }
 
 /**
- * The demo world: a renderer, the doors above it, and a player.
+ * The demo world: a renderer, the simulation above it, and a player.
  *
  * Deliberately free of DOM and timers so the whole thing can be stepped and
  * rendered in a test. `main.ts` is the only part that knows about the browser.
+ *
+ * Everything here is composition. The library supplies wall sliding and door
+ * policy; this class decides only what the *game* decides — how fast the player
+ * walks, how far they can reach, and that a door must not close on them.
  */
 export class World {
     readonly renderer = new Renderer();
-    readonly doors = new DoorManager();
+    readonly doors: DoorPolicy;
     readonly player: Player;
     private readonly _mapHelper = new MapHelper();
     private readonly _spacing: number;
@@ -55,6 +55,16 @@ export class World {
         rc.setMetrics(METRICS);
         rc.setShading(SHADING);
         this._spacing = METRICS.spacing;
+        this.doors = new DoorPolicy({
+            map: rc.cellMap,
+            metrics: METRICS,
+            maintainDuration: DOOR_MAINTAIN,
+            // Refuse to close on the player's head.
+            isCellOccupied: (x, y) => {
+                const c = this.cell;
+                return c.x === x && c.y === y;
+            }
+        });
         this.player = {
             x: START.x * METRICS.spacing,
             y: START.y * METRICS.spacing,
@@ -80,45 +90,20 @@ export class World {
 
     /** The cell the player is standing in. */
     get cell(): { x: number; y: number } {
-        return {
-            x: (this.player.x / this._spacing) | 0,
-            y: (this.player.y / this._spacing) | 0
-        };
+        return worldToCell(this.player.x, this.player.y, this._spacing);
     }
 
     /**
      * True if a point is inside a cell the player cannot enter.
      *
      * An opened door reports PHYS_NONE, which is what lets the player walk
-     * through it once it has slid up.
+     * through it once it has slid up. Anything off the map reads as solid, so
+     * this needs no bounds check of its own.
      */
-    private blocked(x: number, y: number): boolean {
-        const cx = (x / this._spacing) | 0;
-        const cy = (y / this._spacing) | 0;
-        const map = this.renderer;
-        if (cx < 0 || cy < 0 || cx >= map.getMapSize() || cy >= map.getMapSize()) {
-            return true;
-        }
-        return map.getCellPhys(cx, cy) !== PHYS_NONE;
-    }
-
-    /**
-     * Moves the player, sliding along walls rather than stopping dead.
-     *
-     * Each axis is tested on its own, so running into a wall at an angle keeps
-     * the component that is still free.
-     */
-    private move(dx: number, dy: number): void {
-        const p = this.player;
-        const rx = dx > 0 ? PLAYER_RADIUS : -PLAYER_RADIUS;
-        const ry = dy > 0 ? PLAYER_RADIUS : -PLAYER_RADIUS;
-        if (dx !== 0 && !this.blocked(p.x + dx + rx, p.y)) {
-            p.x += dx;
-        }
-        if (dy !== 0 && !this.blocked(p.x, p.y + dy + ry)) {
-            p.y += dy;
-        }
-    }
+    private readonly isSolid = (x: number, y: number): boolean => {
+        const c = worldToCell(x, y, this._spacing);
+        return this.renderer.cellMap.getPhys(c.x, c.y) !== PHYS_NONE;
+    };
 
     /**
      * The door cell the player is looking at and standing near, if any.
@@ -128,11 +113,7 @@ export class World {
      */
     aimedDoor(): { x: number; y: number } | null {
         const aimed = this.renderer.aimedCell;
-        if (aimed === null) {
-            return null;
-        }
-        const phys = this.renderer.getCellPhys(aimed.xCell, aimed.yCell);
-        if (phys < PHYS_FIRST_DOOR || phys > PHYS_LAST_DOOR) {
+        if (aimed === null || !this.doors.isDoor(aimed.xCell, aimed.yCell)) {
             return null;
         }
         const dx = aimed.x - this.player.x;
@@ -150,28 +131,7 @@ export class World {
      */
     openAimedDoor(): boolean {
         const door = this.aimedDoor();
-        if (door === null || this.doors.getDoorContext(door.x, door.y) !== undefined) {
-            return false;
-        }
-        const dc = new DoorContext({
-            slidingDuration: 24,
-            maintainDuration: 180,
-            offsetMax: METRICS.height,
-            openFunction: 'smoothstep'
-        });
-        dc.data.x = door.x;
-        dc.data.y = door.y;
-        dc.data.phys = this.renderer.getCellPhys(door.x, door.y);
-        dc.data.autoclose = true;
-        // Refuse to close on the player's head.
-        dc.events.on('check', event => {
-            const c = this.cell;
-            if (c.x === door.x && c.y === door.y) {
-                event.cancel = true;
-            }
-        });
-        this.doors.linkDoorContext(dc);
-        return true;
+        return door !== null && this.doors.openDoor(door.x, door.y, true) !== null;
     }
 
     /**
@@ -190,7 +150,11 @@ export class World {
             const sin = Math.sin(p.angle);
             const dx = (cos * input.forward - sin * input.strafe) * WALK_SPEED;
             const dy = (sin * input.forward + cos * input.strafe) * WALK_SPEED;
-            this.move(dx, dy);
+            const moved = computeWallCollisions(
+                p.x, p.y, dx, dy, PLAYER_RADIUS, this._spacing, false, this.isSolid
+            );
+            p.x = moved.pos.x;
+            p.y = moved.pos.y;
         }
 
         if (input.use) {

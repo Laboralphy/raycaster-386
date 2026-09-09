@@ -1,5 +1,5 @@
-import { PHYS_DOOR_UP, PHYS_NONE, PHYS_WALL } from '../src/index.js';
-import type { LevelMap } from '../src/index.js';
+import { PHYS_DOOR_UP, PHYS_NONE, PHYS_WALL } from '../../src/index.js';
+import type { LevelMap } from '../../src/index.js';
 
 /** Map character for open floor. */
 const VOID = ' ';

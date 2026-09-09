@@ -4,8 +4,20 @@ import {
     CELL_OFFSET_SHIFT,
     CELL_PHYS_MASK,
     CELL_PHYS_SHIFT,
+    PHYS_WALL,
     type PhysCode
 } from '../consts.js';
+
+/**
+ * What a cell outside the map reads as: solid, with no material and no offset.
+ *
+ * The map is a flat array indexed `y * size + x`, so an out-of-range
+ * coordinate is not merely absent — `(-1, 1)` computes to a valid index in the
+ * row above. Reads outside therefore have to be answered explicitly rather
+ * than left to the array, and answering "solid" is the safe direction: the
+ * alternative, phys 0, tells a caller it may walk off the edge of the world.
+ */
+const OUTSIDE = PHYS_WALL << CELL_PHYS_SHIFT;
 
 /**
  * The square grid of cell codes.
@@ -23,7 +35,32 @@ import {
  * of arrays: `projectRay` reads one cell per DDA step and `renderFlats` walks
  * the map essentially at random, so one indexed load beats two dependent ones.
  */
-export class CellMap {
+/**
+ * Everything a {@link CellMap} can be asked, with nothing that can change it.
+ *
+ * A renderer hands this out rather than the map itself, because
+ * `Renderer.setCellPhys` also re-traces every light overlapping the cell and
+ * `setMapSize` resizes the surface and light buffers alongside the map —
+ * writing to the map directly would skip both and leave them stale.
+ *
+ * The same object is returned; the interface is erased at build time, so this
+ * costs nothing and copies nothing. It stops the accident, not the determined:
+ * a cast defeats it, as it would any type-level guarantee.
+ *
+ * {@link CellMap.data} is deliberately absent — it is a writable
+ * `Uint32Array`, and exposing it here would reopen the hole. The render path
+ * reaches the full map through its own context, not through this view.
+ */
+export interface ReadonlyCellMap {
+    readonly size: number;
+    isInside(x: number, y: number): boolean;
+    get(x: number, y: number): number;
+    getMaterial(x: number, y: number): number;
+    getPhys(x: number, y: number): PhysCode;
+    getOffset(x: number, y: number): number;
+}
+
+export class CellMap implements ReadonlyCellMap {
     private _data = new Uint32Array(0);
     private _size = 0;
 
@@ -60,25 +97,41 @@ export class CellMap {
         return x >= 0 && y >= 0 && x < this._size && y < this._size;
     }
 
-    /** The whole packed code of a cell. */
+    /**
+     * The whole packed code of a cell, or {@link OUTSIDE} beyond the map.
+     *
+     * Every accessor below is bounds-checked. The hot loops do not go through
+     * them — `projectRay` and `renderFlats` read {@link data} and extract the
+     * bits themselves — so the check costs nothing where it would have mattered.
+     */
     get(x: number, y: number): number {
-        return this._data[y * this._size + x];
+        return this.isInside(x, y) ? this._data[y * this._size + x] : OUTSIDE;
     }
 
+    /** Writes outside the map are dropped, never wrapped into another row. */
     set(x: number, y: number, code: number): void {
-        this._data[y * this._size + x] = code;
+        if (this.isInside(x, y)) {
+            this._data[y * this._size + x] = code;
+        }
     }
 
     getMaterial(x: number, y: number): number {
-        return this._data[y * this._size + x] & CELL_MATERIAL_MASK;
+        return this.isInside(x, y) ? this._data[y * this._size + x] & CELL_MATERIAL_MASK : 0;
     }
 
     setMaterial(x: number, y: number, code: number): void {
+        if (!this.isInside(x, y)) {
+            return;
+        }
         const i = y * this._size + x;
         this._data[i] = (this._data[i] & ~CELL_MATERIAL_MASK) | (code & CELL_MATERIAL_MASK);
     }
 
+    /** The phys code, or PHYS_WALL beyond the map. */
     getPhys(x: number, y: number): PhysCode {
+        if (!this.isInside(x, y)) {
+            return PHYS_WALL as PhysCode;
+        }
         return ((this._data[y * this._size + x] >>> CELL_PHYS_SHIFT) & CELL_PHYS_MASK) as PhysCode;
     }
 
@@ -87,9 +140,13 @@ export class CellMap {
      *
      * @returns true if the value actually changed. The caller uses this to
      * decide whether the light map's blocking state needs updating, which is
-     * expensive enough to be worth skipping on a no-op write.
+     * expensive enough to be worth skipping on a no-op write. A write outside
+     * the map changes nothing and reports false.
      */
     setPhys(x: number, y: number, code: number): boolean {
+        if (!this.isInside(x, y)) {
+            return false;
+        }
         const i = y * this._size + x;
         const prev = this._data[i];
         const next =
@@ -103,10 +160,16 @@ export class CellMap {
     }
 
     getOffset(x: number, y: number): number {
+        if (!this.isInside(x, y)) {
+            return 0;
+        }
         return (this._data[y * this._size + x] >>> CELL_OFFSET_SHIFT) & CELL_OFFSET_MASK;
     }
 
     setOffset(x: number, y: number, code: number): void {
+        if (!this.isInside(x, y)) {
+            return;
+        }
         const i = y * this._size + x;
         this._data[i] =
             (this._data[i] & ~(CELL_OFFSET_MASK << CELL_OFFSET_SHIFT)) |

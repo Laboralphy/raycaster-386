@@ -7,7 +7,7 @@ import {
 } from './consts.js';
 import { context2d, createCanvas, getData, resize, setImageSmoothing, type ImageSource } from './core/canvas.js';
 import { MarkerRegistry } from './core/MarkerRegistry.js';
-import { CellMap } from './core/CellMap.js';
+import { CellMap, type ReadonlyCellMap } from './core/CellMap.js';
 import { CellSurfaceManager } from './map/CellSurfaceManager.js';
 import { LightMap } from './light/LightMap.js';
 import { LightSource } from './light/LightSource.js';
@@ -337,13 +337,14 @@ export class Renderer {
     /**
      * The cell map, so that code with no interest in rendering can read it.
      *
-     * Reads are free. **Writes should go through this renderer** while one is
-     * attached: {@link setCellPhys} also re-traces the light map, and
+     * Read-only by type: {@link setCellPhys} also re-traces the light map and
      * {@link setMapSize} resizes the surface and light buffers alongside the
-     * map. Writing to the map directly skips both. A headless caller with no
-     * renderer has neither buffer to keep in step and can write freely.
+     * map, so writes have to go through this renderer while one is attached.
+     * Whoever constructed the map still holds a writable {@link CellMap} — a
+     * headless caller with no renderer has neither buffer to keep in step and
+     * can write to it freely.
      */
-    get cellMap(): CellMap {
+    get cellMap(): ReadonlyCellMap {
         return this._map;
     }
 
