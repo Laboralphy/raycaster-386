@@ -7,10 +7,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Root of the original JavaScript engine, used only by differential tests.
- * Override with LEGACY_ENGINE=/path/to/o876-raycaster-engine.
+ * Defaults to the copy imported into `_OLD_PROJECT_/`, so the tests need
+ * nothing outside this project. Override with
+ * LEGACY_ENGINE=/path/to/o876-raycaster-engine.
  */
 export const LEGACY_ROOT = resolve(
-    process.env.LEGACY_ENGINE ?? resolve(here, '../../../o876-raycaster-engine')
+    process.env.LEGACY_ENGINE ?? resolve(here, '../../_OLD_PROJECT_')
 );
 
 /** True if the original engine is checked out next to this project. */

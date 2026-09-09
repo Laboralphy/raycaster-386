@@ -498,14 +498,95 @@ load time. `MapHelper` handles only the legend and grid; everything else is
 `Engine.buildLevel()`. The demo therefore declares its level with the
 constants referenced directly — see `demo/level.ts`.
 
-## 11. What is left
+## 11. The level loader
 
-1. **An RCE-100 level loader**, if levels should load from their saved form
-   rather than being declared in code (§10).
-2. **The rest of `libs/engine`.** `Engine.js`, thinkers, collision, the tag
-   system, level loading, audio. All six demos in `apps/demos/` depend on it;
-   none drive `Renderer` directly. This is a separate migration, comparable in
-   size to the one documented here.
+`src/level/` loads the RCE-100 files the original map editor saves — the gap
+§10 found. It covers everything the renderer understands and nothing above it.
+
+**RCE-100 is an importer, not the native shape.** `toLevelMap()` projects the
+file's `level` section onto `LevelMap`, the structure `MapHelper` already took.
+It is written out field by field rather than cast, so the two can diverge: a
+level declared in code (`demo/level.ts`) never touches the RCE types, and a
+second input format would be a second importer rather than a change here.
+
+**Symbols resolve strictly.** A saved level writes `"@PHYS_WALL"` rather than
+`1`, so the file survives a renumbering. The original resolved these through a
+`Translator` with `strict = false`, so `"@PHYS_WALLL"` stayed a string and the
+level loaded and then behaved wrongly — that cell silently became walkable. A
+schema cannot catch it either: the typo is a perfectly good string. Here an
+unknown symbol throws. All 13 symbols the shipped mansion levels use resolve.
+
+**Schema validation is a hook, not a dependency.** `Engine.buildLevel` called
+`jsonValidate(data, SCHEMA_RCE_100)` unconditionally, which costs an npm
+dependency and a walk of a 120 kB document on every load, to catch a class of
+bug the map editor could have caught when it saved. So `loadLevel` takes an
+optional `validate` hook instead, and the schema ships as data on its own entry
+point:
+
+```ts
+import RCE_100_SCHEMA from 'raycaster-386/schema';
+
+await loadLevel(rc, level, {
+    loadImage,
+    validate: import.meta.env.DEV ? d => jsonValidate(d, RCE_100_SCHEMA) : undefined
+});
+```
+
+A game shipping levels it authored validates while developing and drops both
+the validator and the 22 kB from its release build; a level editor, or a game
+loading maps it did not write, wires it permanently. The library holds the
+format and the loader; the caller decides when checking is worth paying for.
+It is the same cut as `loadImage`, which the library also refuses to own —
+one primitive that differs per host, supplied from outside, with all the logic
+staying in.
+
+The hook runs first, before anything touches the renderer, so a rejected level
+cannot leave it half-configured with some materials registered and some not.
+
+The schema is shipped **unmodified**, so a level valid here is valid upstream.
+That means it still requires `blueprints`, `objects` and `camera` — sections
+this library reports rather than interprets. A level authored for this library
+alone, omitting the entity tier, will not satisfy it. Relaxing that is a format
+change and would need a new version string, not an edit to RCE-100.
+
+**Everything above the renderer is reported, not dropped.** `LoadedLevel.unhandled`
+hands back `blueprints`, `objects`, `tags` and `camera` intact, so a caller can
+build its own entity tier without re-parsing the file. `tags` is the clearest
+case: the original owned a `TagManager` and a tag grid; here the cells and
+their tags are simply handed over.
+
+Tilesets are decoded lazily — only when a decal names one — so a sheet that
+only entities use costs nothing, and they are returned undecorated rather than
+pre-shaded, since what a game does with a sprite sheet is the game's business.
+
+## 12. Scope: a library, not a framework
+
+The original grew into a framework: `Engine.js` alone is 51.6 kB and owns the
+game loop, asset loading, audio, the entity tier and the camera's AI. This port
+is deliberately not that. It is a set of modules a game calls; it never calls
+the game.
+
+Concretely, what remains worth taking from `libs/`:
+
+| Piece | Original | Size |
+|---|---|---|
+| Wall collision | `libs/wall-collider` | 84 lines |
+| Tag grid | `libs/tag-grid` | 172 lines |
+| Sector registry | `libs/sector-registry` | 109 lines |
+
+Roughly 370 lines, each standalone and each opt-in.
+
+And what is deliberately out, with the demo showing how a caller supplies it:
+
+| Piece | Original | Why out |
+|---|---|---|
+| Game loop, asset pipeline, audio | `Engine.js`, 51.6 kB | the caller owns its loop and its I/O |
+| Entity AI | `thinkers/`, 48 kB | a framework of its own; `FPSControlThinker` is demo material |
+| Entities, hordes, blueprints | `Entity`, `Horde`, `Blueprint` | the entity tier, reported by `loadLevel` and built by the game |
+| Post-processing | `filters/`, 44 kB | at most a separate package later |
+| Schema machinery | `documents/`, `translator`, `json-validate` | replaced by strict resolution plus the `validate` hook (§11) |
+
+That is about 150 kB of framework the library does not absorb.
 
 ---
 

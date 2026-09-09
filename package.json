@@ -14,6 +14,10 @@
     "./engine": {
       "types": "./dist/engine.d.ts",
       "import": "./dist/engine.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js"
     }
   },
   "files": [
@@ -43,7 +47,7 @@
     "laboralphy"
   ],
   "author": {
-    "name": "Raphaël Marandet",
+    "name": "Rapha\u00ebl Marandet",
     "email": "raphael.marandet@gmail.com"
   },
   "license": "ISC",
@@ -52,6 +56,9 @@
     "@types/node": "^26.5.0",
     "esbuild": "^0.28.2",
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0"
-  }
+    "vitest": "^3.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "typescript-eslint": "^8.70.0"
+  },
+  "dependencies": {}
 }

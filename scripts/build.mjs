@@ -8,7 +8,11 @@ const watch = process.argv.includes('--watch');
  * `target: es2022` keeps ?./??/class fields native instead of downleveled.
  */
 const common = {
-    entryPoints: { index: 'src/index.ts', engine: 'src/engine/index.ts' },
+    entryPoints: {
+        index: 'src/index.ts',
+        engine: 'src/engine/index.ts',
+        schema: 'src/level/schema.ts'
+    },
     bundle: true,
     format: 'esm',
     target: 'es2022',
@@ -19,9 +23,10 @@ const common = {
 };
 
 /**
- * The renderer and the engine layer are separate bundles: a project that only
- * needs rendering should not pull in door simulation, and the split keeps the
- * dependency direction visible.
+ * The renderer, the engine layer and the level schema are separate bundles: a
+ * project that only needs rendering should not pull in door simulation, and
+ * one that does not validate levels at load time should not pay for 22 kB of
+ * schema. The split also keeps the dependency direction visible.
  */
 const builds = [
     { ...common, outdir: 'dist', entryNames: '[name]' },

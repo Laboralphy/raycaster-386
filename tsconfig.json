@@ -26,6 +26,10 @@
        `// falls through` comment, so this check cannot be satisfied. */
     "noFallthroughCasesInSwitch": false,
 
+    /* The RCE-100 schema ships as data on its own entry point; see
+       src/level/schema.ts. */
+    "resolveJsonModule": true,
+
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "forceConsistentCasingInFileNames": true,

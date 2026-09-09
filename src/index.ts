@@ -50,3 +50,11 @@ export type {
     LevelMap, MapRow, MaterialDef, MaterialLight, FaceDef, FaceAnimation,
     BuiltMaterial, BlockLight, BuildResult
 } from './map/MapHelper.js';
+
+export { loadLevel, RCE_VERSION } from './level/loadLevel.js';
+export type { LoadLevelOptions, LoadedLevel } from './level/loadLevel.js';
+export { LEVEL_CONSTANTS, resolveConstant, resolveConstants } from './level/constants.js';
+export type {
+    RceLevel, RceMetrics, RceTextures, RceShading, RceTileset,
+    RceLightSource, RceDecal, RceDecalFace, RceStartPoint, RceTag, DecalAlign
+} from './level/types.js';

@@ -27,11 +27,18 @@ npm run build      # dist/index.js + dist/engine.js
 | 5 | Measured optimisations | done |
 | 6 | Engine layer: doors + easing | done |
 | 7 | Renderer-level demo | done |
+| 8 | RCE-100 level loading | done |
 
 `libs/raycaster` is fully ported, plus the first slice of the engine layer
-(doors and easing). The port renders all 34 golden cases; 29 are
-pixel-identical to the original and 5 differ deliberately (see below), and it
-is ~3% faster overall. `npm run demo` plays it.
+(doors and easing) and a loader for the map editor's saved format. The port
+renders all 34 golden cases; 29 are pixel-identical to the original and 5
+differ deliberately (see below), and it is ~3% faster overall. `npm run demo`
+plays it.
+
+This is a **library, not a framework**: a game owns its loop, its I/O and its
+entities, and calls in. The 150 kB of `Engine.js`, thinkers and filters that
+sat above the renderer upstream is deliberately not being ported — see §12 of
+the migration doc for what is in scope and what is not.
 
 Migration progress, decisions and known gaps are recorded in
 [documentation/MIGRATION_FROM_JS.md](documentation/MIGRATION_FROM_JS.md).
@@ -50,6 +57,16 @@ Replaced by typed setters that mark a `Dirty` bitmask, revalidated once at the
 top of `render()`. That keeps the one genuinely useful property of the Reactor
 — coalescing several option writes into a single re-shade — and drops ~380
 lines of `Reactor` + `Translator` + `Extender` machinery.
+
+**Validation is a hook, not a dependency.** `Engine.buildLevel` validated
+every level against a 22 kB JSON schema on every load, which costs an npm
+dependency and a walk of a 120 kB document to catch what the map editor could
+have caught on save. `loadLevel` takes an optional `validate` callback
+instead, and the schema ships as data on its own entry point
+(`raycaster-386/schema`), so a game can check its levels while developing and
+drop both from its release build. What the library always does is stricter and
+free: an unknown `@SYMBOL` throws, where the original's translator passed the
+typo through as a string.
 
 **No I/O in the renderer.** Callers pass already-decoded images
 (`setWallTextures(canvas)`). The original loaded texture URLs from inside an
@@ -94,6 +111,11 @@ src/
     LightSource.ts
   Sprite.ts
   DebugDisplay.ts
+  level/                  RCE-100 loading; an importer onto LevelMap, not a second native shape
+    types.ts              the saved format, as written by the map editor
+    constants.ts          "@PHYS_WALL" and friends, resolved strictly
+    loadLevel.ts          builds a renderer; reports what it does not handle
+    rce-100.json          the format schema, shipped unmodified on its own entry point
   engine/                 simulation above the renderer; separate bundle
     Easing.ts
     DoorContext.ts        one door's state machine
