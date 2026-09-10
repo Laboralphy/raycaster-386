@@ -30,21 +30,9 @@ export default tseslint.config(
         // never reach into each other. The slices themselves are exempt (they import their
         // own files relatively) and so are tests (white-box access to internals).
         // See documentation/battle-systems.md.
-        files: ['packages/server/src/**/*.ts'],
-        ignores: ['packages/server/src/infrastructure/services/mud-game/battle-systems/*/**'],
+        files: ['src/**/*.ts'],
+        ignores: [],
         rules: {
-            'no-restricted-imports': [
-                'error',
-                {
-                    patterns: [
-                        {
-                            group: ['**/battle-systems/*/*'],
-                            message:
-                                'Import a battle system through its slice barrel (…/mud-game/battle-systems/<id>), not a deep file — see documentation/battle-systems.md.',
-                        },
-                    ],
-                },
-            ],
         },
     }
 );

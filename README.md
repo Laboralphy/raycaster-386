@@ -47,7 +47,9 @@ from forming, and what would let the simulation run headless on a server. See
 is in scope, what is not, and in what order.
 
 Where the migration stands, and what to pick up next, is in
-[documentation/PROGRESS.md](documentation/PROGRESS.md).
+[documentation/PROGRESS.md](documentation/PROGRESS.md). A separate analysis of the
+old level editor, and what replacing it would take, is in
+[documentation/MAPEDIT_ANALYSIS.md](documentation/MAPEDIT_ANALYSIS.md).
 
 Migration progress, decisions and known gaps are recorded in
 [documentation/MIGRATION_FROM_JS.md](documentation/MIGRATION_FROM_JS.md), and
