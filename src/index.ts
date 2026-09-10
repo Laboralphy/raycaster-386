@@ -50,6 +50,9 @@ export type { FlatContext } from './render/renderFlats.js';
 export { renderScreenSlice, renderScreenSliceBuffer } from './render/renderScreenSlice.js';
 export { renderSprite, renderSprites } from './render/renderSprites.js';
 export { faceCamera, SPRITE_DIRECTION_COUNT } from './render/spriteFacing.js';
+export { SpriteBinding } from './render/spriteBinding.js';
+export type { CameraPosition } from './render/spriteBinding.js';
+export type { ActorId, ActorUpdate, ActorFrame } from './core/actorFrame.js';
 export { renderBackground } from './render/renderBackground.js';
 export { MapHelper } from './map/MapHelper.js';
 export type {

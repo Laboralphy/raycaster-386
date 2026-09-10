@@ -391,7 +391,7 @@ coincident actors along a fixed axis, which is deterministic — lockstep needs
 that — and `Vector.normalize()` returns zero rather than `NaN` for a zero
 vector.
 
-### 4.6 Actors — `split`, ~448 lines
+### 4.6 Actors — **done**
 
 `Entity` (136), `Horde` (171), `Engine.createEntity` (988-1057),
 `destroyEntity` (1058-1076), `linkEntityLightSource` (1077-1092),
@@ -412,7 +412,31 @@ construction (§3.1), the size/behaviour half is a Simulation actor template.
 becomes "this actor emits light", reported as data, applied by whoever owns
 both.
 
-### 4.7 Behaviour — `take`, ~764 of 785 lines
+**Done.** `Actor` holds a position, size, `data`, `ref` and a `Dummy` — no
+sprite and no light. `ActorRegistry` ticks behaviour, files actors into
+sectors, and returns an `ActorFrame` of plain data: `moved` (sparse) and
+`removed` (drained each tick). `SpriteBinding`, in Rendering, consumes that
+frame and moves sprites, moves lights, turns billboards and disposes the dead,
+so a game writes one line a tick.
+
+The contract itself lives in `src/core/actorFrame.ts`, below both tiers, so
+neither imports the other.
+
+Two notes on what changed:
+
+- **Movement is detected against the actor's own last reported position.** The
+  original compared against `sprite.z`, which `Sprite` does not define, so the
+  answer was always "moved" and every light and sector was rewritten every
+  frame. Detecting it in Simulation is also what lets it work headless.
+- **`dead` is the game's flag.** It means "remove me now", not "hit points
+  reached zero" — mansion's ghosts play a death animation while still alive.
+  The registry sweeps on the next tick and reports the id once.
+
+`moveActor(actor, context, v)` is the movement primitive extracted from
+`MoverThinker`: it wires `computeWallCollisions` to an actor's position and
+size. A function, not a base class, since §4.7 was declined.
+
+### 4.7 Behaviour — **skip** (decided 2026-09-10)
 
 `thinkers/`: `Thinker` (102), `MoverThinker` (139), `TangibleThinker` (44),
 `StaticThinker` (17), `StaticTangibleThinker` (18), `MissileThinker` (157),
@@ -422,7 +446,17 @@ Movement, projectile and first-person-control maths over actors. A base class
 the *game* subclasses and the simulation ticks is a callback, not inversion of
 control, so it passes the rule.
 
-**`FPSControlThinker` belongs here, not in Game.** An earlier verdict put it out
+**Not ported, by the author's decision.** The thinkers are a base class over
+`libs/automaton`, a string-keyed state machine (`main: { loop: ['$move'] }`,
+dispatched by `this[name](...)`), and the author would rather bring a different
+state-machine implementation than carry that one forward. Behaviour is the
+game's; the library ships the `Thinker<C>` interface as the plug point, and
+`moveActor` as the one piece worth not rewriting — see §4.6.
+
+What follows is kept as a record of what was analysed, in case the decision is
+revisited.
+
+**`FPSControlThinker` would belong here, not in Game.** An earlier verdict put it out
 of scope on the grounds that it reads the keyboard. It does not: it imports only
 `Easing`, `TangibleThinker`, consts and `Vector`, and takes input through an
 abstract command API — `keyDown(key)`, `keyUp(key)`, `isCommandOn(cmd)`,

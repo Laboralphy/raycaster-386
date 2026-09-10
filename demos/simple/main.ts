@@ -1,4 +1,5 @@
 import { Canvas } from '../../src/index.js';
+import { buildSentinelAtlas } from './spriteAtlas.js';
 import { TEXTURES } from './level.js';
 import { emptyInput, World, type Input } from './world.js';
 
@@ -54,7 +55,9 @@ async function main(): Promise<void> {
     status.textContent = 'loading textures...';
     // The renderer performs no I/O: images are decoded here and handed in.
     const [walls, flats] = await Canvas.loadCanvases([TEXTURES.walls, TEXTURES.flats]);
-    world.build(walls, flats);
+    // The sentinel's atlas is drawn rather than loaded, so the demo stays two
+    // asset files.
+    world.build(walls, flats, buildSentinelAtlas());
     status.textContent = '';
 
     const target = canvas.getContext('2d') as CanvasRenderingContext2D;

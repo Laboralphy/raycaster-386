@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { World, emptyInput } from '../../../demos/simple/world.js';
+import { buildSentinelAtlas } from '../../../demos/simple/spriteAtlas.js';
 import { PHYS_NONE } from '../../../src/index.js';
 import { installDom } from '../../harness/dom.js';
 import { compareFrames, isClean } from '../../harness/compare.js';
@@ -40,7 +41,7 @@ describe('demo world', () => {
     function world(): World {
         const w = new World();
         w.setScreen(160, 100);
-        w.build(walls, flats);
+        w.build(walls, flats, buildSentinelAtlas());
         return w;
     }
 
@@ -63,14 +64,14 @@ describe('demo world', () => {
 
     it('walks forward and stops at a wall instead of leaving the map', () => {
         const w = world();
-        const start = { ...w.player };
+        const start = { ...w.player.position };
         const input = { ...emptyInput(), forward: 1 };
         for (let i = 0; i < 400; ++i) {
             w.update(input);
             w.render();
         }
         // It moved...
-        expect(Math.hypot(w.player.x - start.x, w.player.y - start.y)).toBeGreaterThan(64);
+        expect(Math.hypot(w.player.position.x - start.x, w.player.position.y - start.y)).toBeGreaterThan(64);
         // ...and is still somewhere legal, not inside a wall or outside.
         const c = w.cell;
         expect(c.x).toBeGreaterThanOrEqual(0);
@@ -81,24 +82,24 @@ describe('demo world', () => {
     it('slides along a wall rather than sticking to it', () => {
         // Walking diagonally into a wall should keep the free component.
         const w = world();
-        w.player.x = 1.5 * 64;
-        w.player.y = 6.5 * 64;
-        w.player.angle = Math.PI; // facing west, into the wall at x=0
-        const before = w.player.y;
+        w.player.position.x = 1.5 * 64;
+        w.player.position.y = 6.5 * 64;
+        w.player.position.angle = Math.PI; // facing west, into the wall at x=0
+        const before = w.player.position.y;
         const input = { ...emptyInput(), forward: 1, strafe: 1 };
         for (let i = 0; i < 30; ++i) {
             w.update(input);
         }
-        expect(Math.abs(w.player.y - before)).toBeGreaterThan(8);
+        expect(Math.abs(w.player.position.y - before)).toBeGreaterThan(8);
         expect(w.renderer.getCellPhys(w.cell.x, w.cell.y)).toBe(PHYS_NONE);
     });
 
     /** Puts the player in the corridor, one cell south of the door, facing it. */
     function atDoor(): World {
         const w = world();
-        w.player.x = 2.5 * 64;
-        w.player.y = 3.5 * 64;
-        w.player.angle = -Math.PI / 2;
+        w.player.position.x = 2.5 * 64;
+        w.player.position.y = 3.5 * 64;
+        w.player.position.angle = -Math.PI / 2;
         w.render();
         return w;
     }
@@ -149,7 +150,7 @@ describe('demo world', () => {
             w.update(forward);
             w.render();
         }
-        expect(w.player.y, 'did not get through the open door').toBeLessThan(2.9 * 64);
+        expect(w.player.position.y, 'did not get through the open door').toBeLessThan(2.9 * 64);
     });
 
     it('refuses to open the same door twice', () => {
@@ -166,10 +167,68 @@ describe('demo world', () => {
         for (let i = 0; i < 40; ++i) w.update(idle);
 
         // Stand in the doorway and run well past the maintain duration.
-        w.player.x = 2.5 * 64;
-        w.player.y = 2.5 * 64;
+        w.player.position.x = 2.5 * 64;
+        w.player.position.y = 2.5 * 64;
         for (let i = 0; i < 400; ++i) w.update(idle);
         expect(w.doors.contexts.length, 'the door retired while occupied').toBe(1);
         expect(w.renderer.getCellPhys(2, 2)).toBe(PHYS_NONE);
+    });
+
+    it('paces the sentinel and turns it around at the wall', () => {
+        const w = world();
+        const s = w.sentinel!;
+        expect(s, 'build() should have placed a sentinel').not.toBeNull();
+
+        const startY = s.position.y;
+        const startDirection = s.data.direction as number;
+        let reversed = false;
+        for (let i = 0; i < 400; ++i) {
+            w.update(emptyInput());
+            if ((s.data.direction as number) !== startDirection) {
+                reversed = true;
+                break;
+            }
+        }
+        expect(reversed, 'the sentinel never reached a wall').toBe(true);
+        expect(Math.abs(s.position.y - startY), 'it barely moved').toBeGreaterThan(16);
+        // It stayed inside the map rather than sliding through the wall.
+        expect(s.position.y).toBeGreaterThan(64);
+        expect(s.position.y).toBeLessThan(9 * 64);
+    });
+
+    it('keeps the sentinel sprite and its light on the sentinel', () => {
+        const w = world();
+        const s = w.sentinel!;
+        const sprite = w.binding.get(s.id)!;
+        expect(sprite, 'nothing was bound to the sentinel').toBeDefined();
+
+        for (let i = 0; i < 30; ++i) {
+            w.update(emptyInput());
+        }
+        expect([sprite.x, sprite.y], 'the sprite lagged behind the actor')
+            .toEqual([s.position.x, s.position.y]);
+    });
+
+    it('will not shut a door on the player, because the player is an actor', () => {
+        const w = world();
+        // Stand in the doorway at (2, 2) and open it.
+        w.player.position.x = 2.5 * 64;
+        w.player.position.y = 2.5 * 64;
+        w.player.position.angle = -Math.PI / 2;
+        w.update(emptyInput());
+        w.render();
+
+        expect(w.doors.openDoor(2, 2, true), 'the door did not open').not.toBeNull();
+        for (let i = 0; i < 1200; ++i) {
+            w.update(emptyInput());
+        }
+        expect(w.doors.isDoorOpen(2, 2), 'it closed on the player').toBe(true);
+
+        // Step out of the doorway and it settles shut.
+        w.player.position.y = 5.5 * 64;
+        for (let i = 0; i < 1200; ++i) {
+            w.update(emptyInput());
+        }
+        expect(w.doors.contexts.length, 'it never closed once the way was clear').toBe(0);
     });
 });

@@ -5,7 +5,7 @@ give you. The feature-by-feature plan lives in
 [ENGINE_INVENTORY.md](ENGINE_INVENTORY.md); this is the shorter "pick it up
 from here".
 
-Last updated after phase F.
+Last updated after phase D (actors).
 
 ## Read this first: two things that do not travel
 
@@ -33,7 +33,7 @@ work described under "Rendering" below is local only.
 
 ## State
 
-203 tests, 22 files. `npm run check` is typecheck (three configs) + tests +
+237 tests, 25 files. `npm run check` is typecheck (three configs) + tests +
 build. Bundles: `dist/index.js` (rendering, ~111 kB), `dist/simulation.js`
 (~35 kB), `dist/schema.js` (the RCE-100 schema, ~22 kB).
 
@@ -62,6 +62,7 @@ reference there fails the build.
 | **B** | Door policy, cell helpers, secret passages |
 | **C** | Wall sliding, actor collision, sector grid, `Vector` |
 | **F** | Blueprint/tileset merge, decorative objects, sprite facing |
+| **D** | Actors, the actor/sprite seam, `SpriteBinding` — thinkers declined |
 
 **Rendering is complete.** A saved level loads with its architecture, decals,
 lights and scenery — `mans-cabin`'s 89 objects included.
@@ -70,41 +71,55 @@ Simulation is 1,770 lines with 1,234 lines of tests: doors that open, close,
 lock, autoclose, refuse to shut on an occupant, run secret passages and
 save/restore; wall sliding; actor-vs-actor collision over a sector grid.
 
-`demos/simple/` consumes all of it — `world.ts` is 175 lines and holds only
-what a *game* decides (walk speed, reach, and that a door must not close on the
-player). `npm run demo` plays it; `npm run demo -- <name>` runs any other
-directory under `demos/`.
+`demos/simple/` consumes all of it, and is the acceptance test: `world.ts`
+holds only what a *game* decides — walk speed, reach, that a door must not
+close on anyone, and how the sentinel paces. The player is an actor, so the
+door's occupancy check is `actors.actorsAt(x, y)` rather than a hand-rolled
+cell comparison. `npm run demo` plays it; `npm run demo -- <name>` runs any
+other directory under `demos/`.
 
-### Next: phase D — actors (~1,210 lines)
+### The actor seam, as settled
 
-**Do not start by writing code.** The first task is a decision:
+An `Actor` holds a position, size, `data`, `ref` and a collision `Dummy` — **no
+sprite and no light**. The link is `Actor.id`. Each tick, `ActorRegistry.process()`
+returns an `ActorFrame` of plain data:
 
-> How does a Simulation actor bind to a Rendering sprite?
+```ts
+{ moved: readonly ActorUpdate[], removed: readonly ActorId[] }
+```
 
-Upstream, `Entity` holds a `.sprite` — a Rendering object — and mansion's 2,280
-lines of AI reach for `entity.sprite` nine times. So "actors do not hold
-sprites" needs a *mechanism*, not a prohibition. The likely shape: the
-Simulation actor holds an opaque id, and the game's own wrapper owns the
-sprite. `Dummy` (from phase C) is already exactly that — position, radius,
-tangibility masks, an opaque `entity` id, no sprite — so it is half the answer
-already.
+`moved` is sparse, so static scenery costs nothing. `removed` is drained each
+tick. The contract lives in `src/core/actorFrame.ts`, below both tiers, so
+neither imports the other.
 
-Get this wrong and Simulation imports Rendering and the whole separation
-collapses. Everything in D and E inherits it.
+`SpriteBinding` (Rendering) consumes that frame: it moves sprites, moves their
+lights, turns billboards to face the camera, and disposes the dead. A game
+writes one line a tick:
 
-Then: `Entity` + `Horde` (sprite-free), and the thinkers — base, mover,
-tangible, static, missile, and `FPSControlThinker`, which belongs here because
-it takes input through `keyDown`/`keyUp`/`isCommandOn` rather than reading the
-DOM itself.
+```ts
+this.binding.apply(this.actors.process(context), this.player.position);
+```
 
-§4.7 of the inventory carries the measured contract: exactly what mansion's AI
-touches, and which tier each of those lands in.
+Two rules worth not breaking:
 
-### Then: phase E — triggers and scheduling (~412 lines)
+- **`dead` is the game's flag** — "remove me now", not "hit points reached
+  zero". A death animation runs while the actor is still alive.
+- **`moved` is applied before `removed`**, since an actor can be in both.
+
+**Thinkers were declined** (2026-09-10). The originals are a base class over a
+string-keyed state machine; behaviour is the game's, and `Thinker<C>` — just
+`think(actor, context)`, plus optional `attach`/`detach` — is the plug point
+for whatever replaces it. `moveActor(actor, context, v)` is kept as the one
+piece worth not rewriting: it wires wall sliding to an actor's position and
+size.
+
+### Next: phase E — triggers and scheduling (~412 lines)
 
 Tag grid, trigger dispatch rewritten actor-agnostic, scheduler, and
-`getState`/`setState` across every subsystem. Depends on D, since dispatch
-takes actor ids.
+`getState`/`setState` across every subsystem. Actor ids now exist, so dispatch
+has something to key on.
+
+This is the last phase in the plan.
 
 ## Known open items
 

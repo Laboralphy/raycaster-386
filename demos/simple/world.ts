@@ -1,6 +1,8 @@
-import { MapHelper, PHYS_NONE, Renderer, worldToCell } from '../../src/index.js';
-import { computeWallCollisions, DoorPolicy } from '../../src/simulation/index.js';
+import { MapHelper, PHYS_NONE, Renderer, SpriteBinding, Vector, worldToCell } from '../../src/index.js';
+import type { ActorFrame, ReadonlyCellMap } from '../../src/index.js';
+import { Actor, ActorRegistry, DoorPolicy, computeWallCollisions, moveActor } from '../../src/simulation/index.js';
 import { LEVEL, METRICS, SHADING, START } from './level.js';
+import { SENTINEL_FACINGS, SENTINEL_TILE_HEIGHT, SENTINEL_TILE_WIDTH } from './spriteAtlas.js';
 
 /** How close the player must be to a door to open it, in world units. */
 const REACH = 96;
@@ -12,12 +14,14 @@ const TURN_SPEED = 0.045;
 const PLAYER_RADIUS = 12;
 /** How long an opened door waits before closing itself, in ticks. */
 const DOOR_MAINTAIN = 180;
+/** The sentinel's pacing speed, in world units per tick. */
+const SENTINEL_SPEED = 1.1;
 
-export interface Player {
-    x: number;
-    y: number;
-    angle: number;
-    height: number;
+/** Everything the demo's own behaviour needs each tick. */
+export interface DemoContext {
+    map: ReadonlyCellMap;
+    spacing: number;
+    time: number;
 }
 
 /** What the player is asking for this tick. */
@@ -39,38 +43,52 @@ export function emptyInput(): Input {
  * Deliberately free of DOM and timers so the whole thing can be stepped and
  * rendered in a test. `main.ts` is the only part that knows about the browser.
  *
- * Everything here is composition. The library supplies wall sliding and door
- * policy; this class decides only what the *game* decides — how fast the player
- * walks, how far they can reach, and that a door must not close on them.
+ * Everything here is composition. The library supplies wall sliding, door
+ * policy, the actor registry and the sprite binding; this class decides only
+ * what a *game* decides — how fast the player walks, how far they can reach,
+ * that a door must not close on anyone, and how the sentinel paces.
  */
 export class World {
     readonly renderer = new Renderer();
+    readonly actors = new ActorRegistry<DemoContext>();
+    readonly binding: SpriteBinding;
     readonly doors: DoorPolicy;
-    readonly player: Player;
+    /** The player is an actor like any other, so doors see them. */
+    readonly player: Actor<DemoContext>;
+    /** Eye height. Not the same as an actor's altitude. */
+    readonly playerHeight = 1;
+
     private readonly _mapHelper = new MapHelper();
     private readonly _spacing: number;
+    private _sentinel: Actor<DemoContext> | null = null;
+    private _time = 0;
 
     constructor() {
         const rc = this.renderer;
         rc.setMetrics(METRICS);
         rc.setShading(SHADING);
         this._spacing = METRICS.spacing;
+        this.binding = new SpriteBinding(rc);
+
+        // One sector per cell, so "who is standing in this cell" is a lookup.
+        this.actors.setSectors(LEVEL.map.length, METRICS.spacing);
+
         this.doors = new DoorPolicy({
             map: rc.cellMap,
             metrics: METRICS,
             maintainDuration: DOOR_MAINTAIN,
-            // Refuse to close on the player's head.
-            isCellOccupied: (x, y) => {
-                const c = this.cell;
-                return c.x === x && c.y === y;
-            }
+            // A door must not close on anyone — the player included, since the
+            // player is an actor and files into the same sectors.
+            isCellOccupied: (x, y) => this.actors.actorsAt(x, y).length > 0
         });
-        this.player = {
+
+        this.player = this.actors.spawn({
             x: START.x * METRICS.spacing,
             y: START.y * METRICS.spacing,
             angle: START.angle,
-            height: 1
-        };
+            size: PLAYER_RADIUS,
+            ref: 'player'
+        });
     }
 
     /** Sizes the render surface. Call before the first frame. */
@@ -79,18 +97,55 @@ export class World {
     }
 
     /**
-     * Installs textures and builds the map. Textures come in already decoded:
-     * the renderer performs no I/O.
+     * Installs textures, builds the map, and places the sentinel.
+     *
+     * Textures come in already decoded: the renderer performs no I/O.
      */
-    build(walls: HTMLCanvasElement, flats: HTMLCanvasElement): void {
-        this.renderer.setWallTextures(walls);
-        this.renderer.setFlatTextures(flats);
-        this._mapHelper.build(this.renderer, LEVEL);
+    build(walls: HTMLCanvasElement, flats: HTMLCanvasElement, sprites: HTMLCanvasElement): void {
+        const rc = this.renderer;
+        rc.setWallTextures(walls);
+        rc.setFlatTextures(flats);
+        this._mapHelper.build(rc, LEVEL);
+
+        // A sprite is bound to an actor id once; after that the binding keeps
+        // the two together, and the world never touches the sprite again.
+        const sentinel = this.actors.spawn({
+            x: 6.5 * this._spacing,
+            y: 3.5 * this._spacing,
+            size: 10,
+            ref: 'sentinel',
+            data: { direction: 1 }
+        });
+        const tileset = rc.buildTileSet(sprites, SENTINEL_TILE_WIDTH, SENTINEL_TILE_HEIGHT);
+        const sprite = rc.buildSprite(tileset);
+        sprite.buildAnimation(
+            {
+                starts: Array.from({ length: SENTINEL_FACINGS }, (_, i) => i),
+                length: 1,
+                duration: 100,
+                loop: 0
+            },
+            'idle'
+        );
+        sprite.setCurrentAnimation('idle');
+        this.binding.bind(sentinel.id, sprite, {
+            light: rc.addLightSource(sentinel.position.x, sentinel.position.y, 24, 110, 0.6)
+        });
+        this._sentinel = sentinel;
+    }
+
+    /** The sentinel, once {@link build} has placed it. */
+    get sentinel(): Actor<DemoContext> | null {
+        return this._sentinel;
     }
 
     /** The cell the player is standing in. */
     get cell(): { x: number; y: number } {
-        return worldToCell(this.player.x, this.player.y, this._spacing);
+        return worldToCell(this.player.position.x, this.player.position.y, this._spacing);
+    }
+
+    private get context(): DemoContext {
+        return { map: this.renderer.cellMap, spacing: this._spacing, time: this._time };
     }
 
     /**
@@ -116,8 +171,8 @@ export class World {
         if (aimed === null || !this.doors.isDoor(aimed.xCell, aimed.yCell)) {
             return null;
         }
-        const dx = aimed.x - this.player.x;
-        const dy = aimed.y - this.player.y;
+        const dx = aimed.x - this.player.position.x;
+        const dy = aimed.y - this.player.position.y;
         if (dx * dx + dy * dy > REACH * REACH) {
             return null;
         }
@@ -134,15 +189,32 @@ export class World {
         return door !== null && this.doors.openDoor(door.x, door.y, true) !== null;
     }
 
+    /** Paces the sentinel between the walls, turning where it is blocked. */
+    private moveSentinel(context: DemoContext): void {
+        const s = this._sentinel;
+        if (s === null) {
+            return;
+        }
+        const direction = s.data.direction as number;
+        const travelled = moveActor(s, context, new Vector(0, direction * SENTINEL_SPEED));
+        if (travelled.y === 0) {
+            s.data.direction = -direction;
+        }
+        // Face the way it is walking, so the billboard picks the right frame.
+        s.position.angle = direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
+
     /**
      * Advances the world one tick.
      *
-     * The door-to-renderer handoff is here, in the caller, rather than inside
-     * either layer: the simulation never imports the renderer and the renderer
-     * never advances time.
+     * Both handoffs are here, in the caller, rather than inside either layer:
+     * the simulation never imports the renderer and the renderer never
+     * advances time.
      */
     update(input: Input): void {
-        const p = this.player;
+        ++this._time;
+        const context = this.context;
+        const p = this.player.position;
         p.angle += input.turn * TURN_SPEED;
 
         if (input.forward !== 0 || input.strafe !== 0) {
@@ -161,15 +233,22 @@ export class World {
             this.openAimedDoor();
         }
 
+        this.moveSentinel(context);
+
+        // Doors: cell updates applied to the renderer.
         for (const { x, y, offset, phys } of this.doors.process()) {
             this.renderer.setCellOffset(x, y, offset | 0);
             this.renderer.setCellPhys(x, y, phys);
         }
+
+        // Actors: one call moves every bound sprite, its light, and its facing.
+        const frame: ActorFrame = this.actors.process(context);
+        this.binding.apply(frame, p);
     }
 
     /** Draws the current state. */
     render(): void {
-        const p = this.player;
-        this.renderer.render(p.x, p.y, p.angle, p.height);
+        const p = this.player.position;
+        this.renderer.render(p.x, p.y, p.angle, this.playerHeight);
     }
 }
