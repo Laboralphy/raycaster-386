@@ -20,7 +20,7 @@ export type {
 export { DoorManager } from './DoorManager.js';
 export type { DoorCellUpdate, DoorManagerStateEntry } from './DoorManager.js';
 export { DoorPolicy } from './DoorPolicy.js';
-export type { DoorPolicyOptions, DoorPolicyEvents, DoorMetrics } from './DoorPolicy.js';
+export type { DoorPolicyOptions, DoorPolicyEvents, DoorMetrics, DoorPolicyState } from './DoorPolicy.js';
 export {
     forEachNeighbor, CELL_NEIGHBOR_SIDE, CELL_NEIGHBOR_CORNER, CELL_NEIGHBOR_SELF
 } from './neighbors.js';
@@ -36,6 +36,11 @@ export type { SmashingEntity, SmasherEvents } from './Smasher.js';
 export { Actor } from './Actor.js';
 export type { ActorPosition, Thinker } from './Actor.js';
 export { ActorRegistry } from './ActorRegistry.js';
-export type { ActorInit } from './ActorRegistry.js';
+export type { ActorInit, ActorRecord, ActorRegistryState } from './ActorRegistry.js';
 export { moveActor } from './moveActor.js';
 export type { MotionContext } from './moveActor.js';
+export { TagGrid } from './TagGrid.js';
+export type { TagGridState, TagVisit } from './TagGrid.js';
+export { TagTriggers } from './TagTriggers.js';
+export type { TagEvent, TagTriggerEvents } from './TagTriggers.js';
+export { Scheduler } from './Scheduler.js';

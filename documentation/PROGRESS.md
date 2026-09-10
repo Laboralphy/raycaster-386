@@ -5,7 +5,7 @@ give you. The feature-by-feature plan lives in
 [ENGINE_INVENTORY.md](ENGINE_INVENTORY.md); this is the shorter "pick it up
 from here".
 
-Last updated after phase D (actors).
+Last updated after phase E — the last phase in the plan.
 
 ## Read this first: two things that do not travel
 
@@ -33,7 +33,7 @@ work described under "Rendering" below is local only.
 
 ## State
 
-237 tests, 25 files. `npm run check` is typecheck (three configs) + tests +
+267 tests, 27 files. `npm run check` is typecheck (three configs) + tests +
 build. Bundles: `dist/index.js` (rendering, ~111 kB), `dist/simulation.js`
 (~35 kB), `dist/schema.js` (the RCE-100 schema, ~22 kB).
 
@@ -63,6 +63,7 @@ reference there fails the build.
 | **C** | Wall sliding, actor collision, sector grid, `Vector` |
 | **F** | Blueprint/tileset merge, decorative objects, sprite facing |
 | **D** | Actors, the actor/sprite seam, `SpriteBinding` — thinkers declined |
+| **E** | Tag grid, trigger dispatch, scheduler, save/restore |
 
 **Rendering is complete.** A saved level loads with its architecture, decals,
 lights and scenery — `mans-cabin`'s 89 objects included.
@@ -113,13 +114,30 @@ for whatever replaces it. `moveActor(actor, context, v)` is kept as the one
 piece worth not rewriting: it wires wall sliding to an actor's position and
 size.
 
-### Next: phase E — triggers and scheduling (~412 lines)
+### The plan is finished
 
-Tag grid, trigger dispatch rewritten actor-agnostic, scheduler, and
-`getState`/`setState` across every subsystem. Actor ids now exist, so dispatch
-has something to key on.
+Every phase is done bar the thinkers, which were declined. What the library now
+covers:
 
-This is the last phase in the plan.
+**Rendering** — the whole raycaster, level loading, decorative objects, sprite
+facing. **Simulation** — doors and secret passages, wall sliding, actor
+collision, actors and their registry, tags and triggers, scheduling, and save
+and restore across all of it. **Core** — the cell map, grid, markers, vectors,
+geometry, flood fill.
+
+### What is worth doing next, in rough order
+
+1. **The legacy tree decision** (see the top of this file). The suite skips ten
+   files silently without `_OLD_PROJECT_`; a ~2.9 MB subset would make a fresh
+   clone fully testable. Either vendor it or add an import script, and make the
+   skip loud regardless.
+2. **A second demo.** `demos/` is set up for it and the first one now exercises
+   most of the library; a second would test whether the API reads well to
+   someone who did not write it.
+3. **`DoorPolicy` has no differential test** — the largest ported surface with
+   only unit coverage, because its original cannot be isolated from `Engine.js`.
+4. **Upgrade vitest** (3.2.7 → 5) as its own task, on a green tree.
+5. **Package it**: the version is still 0.1.0 and nothing has been published.
 
 ## Known open items
 

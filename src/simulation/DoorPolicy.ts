@@ -42,6 +42,18 @@ export interface DoorPolicyEvents extends Record<string, unknown[]> {
     closed: [{ x: number; y: number }];
 }
 
+/**
+ * Everything a door policy needs to be restored: which doors are live and how
+ * far through their cycle, plus which cells are locked.
+ *
+ * Locks belong here rather than beside them because a lock outlives the door
+ * context — a door that has closed and retired is still locked.
+ */
+export interface DoorPolicyState {
+    doors: DoorManagerStateEntry[];
+    locks: number[];
+}
+
 /** How far each kind of door travels, and how long it takes relative to the base. */
 interface DoorShape {
     offsetMax: number;
@@ -211,8 +223,8 @@ export class DoorPolicy {
 
     // --------------------------------------------------------------- state
 
-    get state(): DoorManagerStateEntry[] {
-        return this.doors.state;
+    get state(): DoorPolicyState {
+        return { doors: this.doors.state, locks: this._locks.state };
     }
 
     /**
@@ -223,8 +235,9 @@ export class DoorPolicy {
      * supplies its phase. Rebuilding from the trailing half instead would run
      * the passage backwards.
      */
-    setState(entries: readonly DoorManagerStateEntry[]): void {
-        const ordered = [...entries].sort(
+    setState(value: DoorPolicyState): void {
+        this._locks.state = value.locks;
+        const ordered = [...value.doors].sort(
             (a, b) => Number(b.child !== undefined) - Number(a.child !== undefined)
         );
         this.doors.setState(ordered, entry =>

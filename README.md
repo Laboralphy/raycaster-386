@@ -263,6 +263,32 @@ Two more surfaced later:
   with nothing left to show where it came from. The port separates coincident
   actors along a fixed axis, and `Vector.normalize()` returns zero rather than
   `NaN`.
+- **A repeating scheduled command with a zero interval hung the loop.**
+  `Scheduler` advanced a repeat with `while (due <= now) due += duration`, which
+  never terminates when the duration is zero. The port rejects a non-positive
+  interval outright.
+- **Flood fill reported cells twice.** A cell was marked only once popped, so
+  several neighbours could push it first — and the starting cell was pushed
+  twice outright, guaranteeing a duplicate in every result. Marking on push
+  fixes both and halves the work on any region wider than a corridor.
+- **`quoteSplit` returned its input when nothing matched.** An empty tag came
+  back as `''` rather than `[]`, so a caller taking the command off the front
+  got a character instead of a word.
+- **Every actor's light and sector were rewritten every frame.** `Horde` decided
+  whether an actor had moved by comparing `sprite.z` against the entity's `z`,
+  and `Sprite` has no `z` — so the answer was always "moved". The port compares
+  an actor against its own last reported position, which also works with
+  nothing drawing.
+- **A directional sprite with fewer than eight facings crashed.** The facing was
+  masked with `& 7`, which can index past a shorter group; the sprite then read
+  `.index` off `undefined`. Facings are now quantised onto the count the sprite
+  actually declares.
+- **`Sprite.buildAnimation` could not be given the array form it documents.**
+  Its parameter type intersected `TileAnimationDef` with `{ start?: number |
+  number[] }`, and intersecting object types intersects their members, so
+  `start` collapsed back to `number`. The array of starts is how a directional
+  sprite is declared, so the whole facing mechanism was unreachable from
+  TypeScript while the runtime supported it.
 - **`isDoorOpen` always threw.** `Engine.isDoorOpen` called
   `oDoor.isDoorOpen(x, y)`, which `DoorContext` does not define, so every cell
   that had a door context raised a TypeError. Dead code upstream, since nothing

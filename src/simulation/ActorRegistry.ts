@@ -13,6 +13,24 @@ export interface ActorInit {
     data?: Record<string, unknown>;
 }
 
+/** One actor, as saved. Behaviour is not included — see {@link ActorRegistry.setState}. */
+export interface ActorRecord {
+    id: ActorId;
+    x: number;
+    y: number;
+    z: number;
+    angle: number;
+    size: number;
+    ref: string;
+    data: Record<string, unknown>;
+}
+
+/** Every actor, plus the counter that keeps new ids from colliding with old. */
+export interface ActorRegistryState {
+    nextId: number;
+    actors: ActorRecord[];
+}
+
 /**
  * Holds the actors, ticks their behaviour, and reports what changed.
  *
@@ -114,6 +132,53 @@ export class ActorRegistry<C = unknown> {
         }
         sector.add(actor);
         this._filed.set(actor.id, sector);
+    }
+
+    get state(): ActorRegistryState {
+        return {
+            nextId: this._nextId,
+            actors: this._actors.map(a => ({
+                id: a.id,
+                x: a.position.x,
+                y: a.position.y,
+                z: a.position.z,
+                angle: a.position.angle,
+                size: a.size,
+                ref: a.ref,
+                data: a.data
+            }))
+        };
+    }
+
+    /**
+     * Restores saved actors, replacing whatever is linked.
+     *
+     * **Behaviour is not restored.** A thinker is code, not data, so the game
+     * reattaches one per actor — `ref` is there to say which. `attach` runs on
+     * the next tick as it would for a new actor, so a tangible actor puts its
+     * body back into the collision set without special handling.
+     *
+     * Every restored actor is reported as moved on the next tick, which is
+     * what tells a sprite binding where things are.
+     */
+    setState(value: ActorRegistryState): void {
+        for (const actor of [...this._actors]) {
+            this.unlink(actor);
+        }
+        this._pendingRemovals = [];
+        this._attached.clear();
+        for (const record of value.actors) {
+            const actor = new Actor<C>(record.id);
+            actor.position.x = record.x;
+            actor.position.y = record.y;
+            actor.position.z = record.z;
+            actor.position.angle = record.angle;
+            actor.size = record.size;
+            actor.ref = record.ref;
+            actor.data = record.data;
+            this.link(actor);
+        }
+        this._nextId = value.nextId;
     }
 
     /**

@@ -497,7 +497,7 @@ nine times over. "Actors do not hold sprites" therefore needs a designed answer
 rather than a prohibition — most likely the game's own actor wrapper holds the
 sprite while the Simulation actor holds an id.
 
-### 4.8 Tag grid — `take`, 172 lines
+### 4.8 Tag grid — **done**
 
 `libs/tag-grid` (`TagGrid.js`, 170). Tags on cells: add, remove, query, remove
 over a painted region, and `visit(from, to)` diffing two positions into
@@ -508,7 +508,13 @@ Depends on: `@laboralphy/grid` (**ported**), `libs/quote-split` (15, parses
 `tag(arg, "quoted arg")`), `libs/painting` (78, flood fill — used only by
 `removeTagRegion`).
 
-### 4.9 Trigger dispatch — `take`, ~133 lines
+**Done:** `src/simulation/TagGrid.ts`, with `quoteSplit` and `floodFill` in
+Core. Tags are interned against numeric ids, so the same text over a whole room
+is one id and retiring it is one `removeTagRegion`. Off-map reads answer as an
+empty cell rather than throwing, which matters because an actor's previous cell
+starts at (-1, -1). Two bugs came out of it — see the README's list.
+
+### 4.9 Trigger dispatch — **done**
 
 `TagManager` (94) and `Engine._tagEnter`/`_tagLeave`/`_tagPush`/`addTag`/`tags`
 (797-835). Turns grid visits into enter/leave/push events and parses tag
@@ -517,13 +523,27 @@ commands.
 Upstream this couples to entities; under §4.6 it couples to actor ids instead,
 which is also what makes it usable when there is more than one player.
 
-### 4.10 Scheduling — `take`, ~107 lines
+**Done:** `src/simulation/TagTriggers.ts`. It consumes the `ActorFrame` the
+registry already produces, so only actors that moved are considered and a room
+of static scenery costs nothing. Its bookkeeping is its own map of id to last
+cell, rather than stashed inside each actor's user data as upstream did.
+
+### 4.10 Scheduling — **done**
 
 `Scheduler` (84), `Engine.delayCommand` (774-784), `cancelCommand` (785-796).
 
 Delay, loop and cancel commands against the simulation clock. It takes a tick
-count rather than reading a clock, so it is deterministic and serialisable —
-which is what moves it inside the perimeter rather than out with the loop.
+count rather than reading a clock, so it is deterministic — which is what moves
+it inside the perimeter rather than out with the loop.
+
+**Done:** `src/simulation/Scheduler.ts`. Commands due in a tick are collected
+before any of them runs, so one that schedules another does not have it fire in
+the same tick. A repeat still catches up across a skipped interval, but a
+non-positive interval is now rejected instead of hanging.
+
+Not serialisable, deliberately: a command is a function. A game that needs a
+delayed effect to survive a save records its own intent and re-schedules on
+load.
 
 ### 4.11 Vector maths — **done**
 
@@ -548,11 +568,23 @@ being unspecified in precision.
 `Position` (56). `vector()` and `front(d)` are the useful parts. Fold into the
 actor type rather than shipping a module.
 
-### 4.13 Save / restore — `take`, ~31 lines
+### 4.13 Save / restore — **done**
 
 `Engine.getEngineState`/`setEngineState` (1499-1515), `getDoorManagerState`/
 `setDoorManagerState` (1516-1528). Serialises door phases, locks, tags and the
 clock. Every Simulation subsystem needs the same pair — see §5.
+
+**Done.** `DoorPolicy.state` carries doors *and* locks — a lock outlives the
+door context, since a door that has closed and retired is still locked.
+`TagGrid.state` round-trips ids as well as text, so an event's `remove()` still
+names the right tag after a load. `ActorRegistry.state` carries positions,
+sizes, refs and user data, and restoring reports every actor as moved so a view
+catches up; behaviour is not restored, because a thinker is code, and `ref` is
+what the game reattaches by.
+
+`tests/simulation/saveRestore.test.ts` puts a whole world — a door caught
+mid-slide, a lock, tags and actors — through `JSON.stringify` and back, then
+ticks both for 300 steps and asserts they stay identical.
 
 ---
 
@@ -680,11 +712,11 @@ Ordered by dependency, and by what gets expensive to change later.
     Design the actor/sprite binding first: mansion's AI reaches for
     `entity.sprite` nine times, so the answer has to be a mechanism, not a ban.
 
-**E — triggers and scheduling.**
-12. Tag grid (§4.8)
-13. Trigger dispatch, actor-agnostic (§4.9)
-14. Scheduler (§4.10)
-15. Save/restore across every subsystem (§4.13, §5)
+**E — triggers and scheduling. Done.**
+12. ~~Tag grid~~ (§4.8)
+13. ~~Trigger dispatch, actor-agnostic~~ (§4.9)
+14. ~~Scheduler~~ (§4.10)
+15. ~~Save/restore across every subsystem~~ (§4.13, §5)
 
 **F — Rendering finish. Done.** Levels now load with their scenery.
 16. ~~`blueprints` / `tilesets` merged into `LoadLevelOptions`~~ (§3.1)
@@ -705,7 +737,7 @@ What remains, if taken as recommended:
 | Tier | Lines | Note |
 |---|---|---|
 | Rendering — remaining | — | complete |
-| Simulation — remaining | ~1,780 | phases D, E |
+| Simulation — remaining | — | complete, less the thinkers (§4.7, declined) |
 | Game / out | ~853 | loop, assets, canvas, events, camera, misc |
 | Separate package | 642 | filters |
 | Never | 1,529 | `Engine.js` as a class |

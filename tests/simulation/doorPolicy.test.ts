@@ -334,7 +334,7 @@ describe('DoorPolicy save and restore', () => {
         // Restore from a state whose trailing half comes first, which is the
         // order DoorManager records it in.
         const saved = JSON.parse(JSON.stringify(dp.state)) as typeof dp.state;
-        expect(saved[0], 'expected the trailing half first').toMatchObject({ x: 3, y: 2 });
+        expect(saved.doors[0], 'expected the trailing half first').toMatchObject({ x: 3, y: 2 });
 
         const restored = policy(map);
         restored.setState(saved);
