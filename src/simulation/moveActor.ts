@@ -24,6 +24,9 @@ export interface MotionContext {
  * every one.
  *
  * @param crashWall stop dead on contact instead of sliding, as a projectile does
+ * @param actor The actor to move
+ * @param context The motion context (cell map + size of a cell)
+ * @param v the movement vector
  * @returns how far the actor actually moved, which is less than `v` against a wall
  */
 export function moveActor(

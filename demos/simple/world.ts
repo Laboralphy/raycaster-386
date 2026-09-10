@@ -1,27 +1,29 @@
-import { MapHelper, PHYS_NONE, Renderer, SpriteBinding, Vector, worldToCell } from '../../src/index.js';
+import { MapHelper, Renderer, SpriteBinding, worldToCell } from '../../src/index.js';
 import type { ActorFrame, ReadonlyCellMap } from '../../src/index.js';
-import { Actor, ActorRegistry, DoorPolicy, computeWallCollisions, moveActor } from '../../src/simulation/index.js';
+import { Actor, ActorRegistry, DoorPolicy } from '../../src/simulation/index.js';
 import { LEVEL, METRICS, SHADING, START } from './level.js';
 import { SENTINEL_FACINGS, SENTINEL_TILE_HEIGHT, SENTINEL_TILE_WIDTH } from './spriteAtlas.js';
+import { PlayerThinker, SentinelThinker } from './thinkers.js';
 
 /** How close the player must be to a door to open it, in world units. */
 const REACH = 96;
-/** Player movement speed, in world units per tick. */
-const WALK_SPEED = 3.2;
-/** Turn speed, in radians per tick. */
-const TURN_SPEED = 0.045;
 /** Keeps the player off the walls, in world units. */
 const PLAYER_RADIUS = 12;
 /** How long an opened door waits before closing itself, in ticks. */
 const DOOR_MAINTAIN = 180;
-/** The sentinel's pacing speed, in world units per tick. */
-const SENTINEL_SPEED = 1.1;
 
-/** Everything the demo's own behaviour needs each tick. */
+/**
+ * Everything a thinker is handed each tick.
+ *
+ * `map` and `spacing` are what {@link MotionContext} asks for, so this can be
+ * passed straight to `moveActor`; `input` is what the player's thinker steers
+ * on.
+ */
 export interface DemoContext {
     map: ReadonlyCellMap;
     spacing: number;
     time: number;
+    input: Input;
 }
 
 /** What the player is asking for this tick. */
@@ -44,9 +46,10 @@ export function emptyInput(): Input {
  * rendered in a test. `main.ts` is the only part that knows about the browser.
  *
  * Everything here is composition. The library supplies wall sliding, door
- * policy, the actor registry and the sprite binding; this class decides only
- * what a *game* decides — how fast the player walks, how far they can reach,
- * that a door must not close on anyone, and how the sentinel paces.
+ * policy, the actor registry and the sprite binding; behaviour lives in
+ * `thinkers.ts`. What is left is what a *game* decides: how far the player can
+ * reach, that a door must not close on anyone, and which of the two layers
+ * hands what to the other.
  */
 export class World {
     readonly renderer = new Renderer();
@@ -82,6 +85,8 @@ export class World {
             isCellOccupied: (x, y) => this.actors.actorsAt(x, y).length > 0
         });
 
+        // The player is driven by a thinker like anything else, so the tick
+        // below has no special case for it.
         this.player = this.actors.spawn({
             x: START.x * METRICS.spacing,
             y: START.y * METRICS.spacing,
@@ -89,6 +94,7 @@ export class World {
             size: PLAYER_RADIUS,
             ref: 'player'
         });
+        this.player.thinker = new PlayerThinker();
     }
 
     /** Sizes the render surface. Call before the first frame. */
@@ -116,6 +122,7 @@ export class World {
             ref: 'sentinel',
             data: { direction: 1 }
         });
+        sentinel.thinker = new SentinelThinker();
         const tileset = rc.buildTileSet(sprites, SENTINEL_TILE_WIDTH, SENTINEL_TILE_HEIGHT);
         const sprite = rc.buildSprite(tileset);
         sprite.buildAnimation(
@@ -144,21 +151,14 @@ export class World {
         return worldToCell(this.player.position.x, this.player.position.y, this._spacing);
     }
 
-    private get context(): DemoContext {
-        return { map: this.renderer.cellMap, spacing: this._spacing, time: this._time };
+    private context(input: Input): DemoContext {
+        return {
+            map: this.renderer.cellMap,
+            spacing: this._spacing,
+            time: this._time,
+            input
+        };
     }
-
-    /**
-     * True if a point is inside a cell the player cannot enter.
-     *
-     * An opened door reports PHYS_NONE, which is what lets the player walk
-     * through it once it has slid up. Anything off the map reads as solid, so
-     * this needs no bounds check of its own.
-     */
-    private readonly isSolid = (x: number, y: number): boolean => {
-        const c = worldToCell(x, y, this._spacing);
-        return this.renderer.cellMap.getPhys(c.x, c.y) !== PHYS_NONE;
-    };
 
     /**
      * The door cell the player is looking at and standing near, if any.
@@ -189,61 +189,36 @@ export class World {
         return door !== null && this.doors.openDoor(door.x, door.y, true) !== null;
     }
 
-    /** Paces the sentinel between the walls, turning where it is blocked. */
-    private moveSentinel(context: DemoContext): void {
-        const s = this._sentinel;
-        if (s === null) {
-            return;
-        }
-        const direction = s.data.direction as number;
-        const travelled = moveActor(s, context, new Vector(0, direction * SENTINEL_SPEED));
-        if (travelled.y === 0) {
-            s.data.direction = -direction;
-        }
-        // Face the way it is walking, so the billboard picks the right frame.
-        s.position.angle = direction > 0 ? Math.PI / 2 : -Math.PI / 2;
-    }
-
     /**
      * Advances the world one tick.
      *
-     * Both handoffs are here, in the caller, rather than inside either layer:
-     * the simulation never imports the renderer and the renderer never
-     * advances time.
+     * Nothing moves anything by hand: the registry runs every thinker and
+     * hands back one frame of movement. What is left are the two handoffs
+     * between the layers, which live here in the caller rather than inside
+     * either one — the simulation never imports the renderer, and the renderer
+     * never advances time.
      */
     update(input: Input): void {
         ++this._time;
-        const context = this.context;
-        const p = this.player.position;
-        p.angle += input.turn * TURN_SPEED;
 
-        if (input.forward !== 0 || input.strafe !== 0) {
-            const cos = Math.cos(p.angle);
-            const sin = Math.sin(p.angle);
-            const dx = (cos * input.forward - sin * input.strafe) * WALK_SPEED;
-            const dy = (sin * input.forward + cos * input.strafe) * WALK_SPEED;
-            const moved = computeWallCollisions(
-                p.x, p.y, dx, dy, PLAYER_RADIUS, this._spacing, false, this.isSolid
-            );
-            p.x = moved.pos.x;
-            p.y = moved.pos.y;
-        }
+        // Behaviour: the player's thinker and the sentinel's both run in here.
+        const frame: ActorFrame = this.actors.process(this.context(input));
 
+        // Using a door reads what the centre ray struck last frame, so it is
+        // the one piece of player input the simulation cannot answer alone.
         if (input.use) {
             this.openAimedDoor();
         }
 
-        this.moveSentinel(context);
-
-        // Doors: cell updates applied to the renderer.
+        // Handoff 1 — doors: cell updates applied to the renderer.
         for (const { x, y, offset, phys } of this.doors.process()) {
             this.renderer.setCellOffset(x, y, offset | 0);
             this.renderer.setCellPhys(x, y, phys);
         }
 
-        // Actors: one call moves every bound sprite, its light, and its facing.
-        const frame: ActorFrame = this.actors.process(context);
-        this.binding.apply(frame, p);
+        // Handoff 2 — actors: one call moves every bound sprite, its light,
+        // and its facing.
+        this.binding.apply(frame, this.player.position);
     }
 
     /** Draws the current state. */

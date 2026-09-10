@@ -5,7 +5,8 @@ give you. The feature-by-feature plan lives in
 [ENGINE_INVENTORY.md](ENGINE_INVENTORY.md); this is the shorter "pick it up
 from here".
 
-Last updated after phase E — the last phase in the plan.
+Last updated 2026-09-10, after the demo was moved onto thinkers. The last
+phase in the plan was E.
 
 ## Read this first: two things that do not travel
 
@@ -72,12 +73,18 @@ Simulation is 1,770 lines with 1,234 lines of tests: doors that open, close,
 lock, autoclose, refuse to shut on an occupant, run secret passages and
 save/restore; wall sliding; actor-vs-actor collision over a sector grid.
 
-`demos/simple/` consumes all of it, and is the acceptance test: `world.ts`
-holds only what a *game* decides — walk speed, reach, that a door must not
-close on anyone, and how the sentinel paces. The player is an actor, so the
-door's occupancy check is `actors.actorsAt(x, y)` rather than a hand-rolled
-cell comparison. `npm run demo` plays it; `npm run demo -- <name>` runs any
-other directory under `demos/`.
+`demos/simple/` consumes all of it, and is the acceptance test. It is split so
+that each file answers one question:
+
+- `world.ts` (229 lines) — composition. What a *game* decides: reach, that a
+  door must not close on anyone, and which layer hands what to the other. The
+  player is an actor, so the door's occupancy check is `actors.actorsAt(x, y)`
+  rather than a hand-rolled cell comparison.
+- `thinkers.ts` (70 lines) — behaviour. `PlayerThinker` and `SentinelThinker`,
+  with the walk, turn and pacing speeds beside the only code that reads them.
+
+`npm run demo` plays it; `npm run demo -- <name>` runs any other directory
+under `demos/`.
 
 ### The actor seam, as settled
 
@@ -107,17 +114,54 @@ Two rules worth not breaking:
   zero". A death animation runs while the actor is still alive.
 - **`moved` is applied before `removed`**, since an actor can be in both.
 
-**Thinkers were declined** (2026-09-10). The originals are a base class over a
-string-keyed state machine; behaviour is the game's, and `Thinker<C>` — just
+**Thinker *implementations* were declined** (2026-09-10), and the demo now
+shows what that leaves. The originals are a base class over a string-keyed
+state machine; behaviour is Game's, and `Thinker<C>` — just
 `think(actor, context)`, plus optional `attach`/`detach` — is the plug point
 for whatever replaces it. `moveActor(actor, context, v)` is kept as the one
 piece worth not rewriting: it wires wall sliding to an actor's position and
 size.
 
+The demo was moved onto that seam the same day. Nothing in `src/` changed:
+
+- The player was the last thing moved by hand — `world.ts` called
+  `computeWallCollisions` directly with its own `isSolid` closure. It now goes
+  through `moveActor` like everything else, so there is one movement path
+  rather than two.
+- Behaviour moved out of `World` into thinkers attached at spawn, so the tick
+  is four steps — run the thinkers, handle `use`, then the two handoffs — with
+  no per-actor branch.
+
+`use` deliberately stayed in `World`: it reads `renderer.aimedCell`, and a
+thinker reaching for renderer state is the arrow this perimeter exists to
+prevent.
+
+Three follow-ups were considered and **not** taken, recorded so they are not
+re-litigated:
+
+- **A name → thinker registry**, so `RceBlueprint.thinker` (`src/level/types.ts:152`)
+  and `ActorRegistry.setState` could resolve a behaviour by name. It is the
+  right shape — Simulation owning the slot, Game the contents — but both
+  motivating cases are inside the library; no game has yet wanted it.
+  Deferred to the second demo, which is the evidence. If it is built,
+  `ActorRecord` needs to carry the thinker name: it has `ref`, and a blueprint
+  keeps `ref` and `thinker` as separate fields.
+- **A shipped `TangibleThinker`**, and then the same wiring inside
+  `ActorRegistry`. Both rejected. An actor has one `thinker` slot and the
+  library must not occupy it, and applying a collision push is a *decision* —
+  a heavy actor shrugs it off — so it cannot be done for every game in
+  `process()`.
+- Which turned out to be moot: **the tangible pattern is already one line from
+  a thinker.** `Smasher.processEntity` sums and decays the field itself
+  (`Smasher.ts:113-114`) and `ActorRegistry.file()` re-syncs `dummy.position`
+  each tick, so a tangible thinker is `moveActor(actor, context, actor.dummy.force)`
+  plus `registerEntity`/`unregisterEntity` in `attach`/`detach`. What is
+  missing is a demo showing it, not library code.
+
 ### The plan is finished
 
-Every phase is done bar the thinkers, which were declined. What the library now
-covers:
+Every phase is done bar the thinker implementations, which belong to Game and
+were declined. What the library now covers:
 
 **Rendering** — the whole raycaster, level loading, decorative objects, sprite
 facing. **Simulation** — doors and secret passages, wall sliding, actor
@@ -133,7 +177,10 @@ geometry, flood fill.
    skip loud regardless.
 2. **A second demo.** `demos/` is set up for it and the first one now exercises
    most of the library; a second would test whether the API reads well to
-   someone who did not write it.
+   someone who did not write it. It also settles two open questions above:
+   whether a thinker registry earns its place (load a real level with
+   blueprints, rather than `simple`'s hardcoded 10x10 map), and whether the
+   tangible pattern reads as easily as it now looks.
 3. **`DoorPolicy` has no differential test** — the largest ported surface with
    only unit coverage, because its original cannot be isolated from `Engine.js`.
 4. **Upgrade vitest** (3.2.7 → 5) as its own task, on a green tree.
