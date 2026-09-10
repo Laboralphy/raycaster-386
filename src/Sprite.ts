@@ -1,5 +1,22 @@
 import { FX_NONE } from './consts.js';
 import { createTileAnimation, TileAnimation, type TileAnimationDef } from './texture/TileAnimation.js';
+
+/**
+ * One animation of a sprite, with a start index per facing.
+ *
+ * A billboard always faces the screen, so which way a thing is pointing is a
+ * choice of frame: the tileset holds one strip per facing laid end to end, and
+ * `starts` says where each begins. `starts.length` is therefore the facing
+ * count, and a single-entry array is a sprite that looks the same from every
+ * angle.
+ *
+ * A level file may write one number or many; normalising that is the loader's
+ * job, so nothing below this line has to deal with both shapes.
+ */
+export interface SpriteAnimationDef extends Omit<TileAnimationDef, 'start'> {
+    /** One first-tile index per facing. Must not be empty. */
+    starts: readonly number[];
+}
 import { ShadedTileSet } from './texture/ShadedTileSet.js';
 
 /** The source and destination rectangles a sprite was last drawn with. */
@@ -89,22 +106,22 @@ export class Sprite {
     }
 
     /**
-     * Adds an animation to a group. Passing an array of `start` indices adds
-     * one animation per index, which is how a directional sprite is declared.
+     * Adds an animation to a group, one per facing in {@link SpriteAnimationDef.starts}.
+     *
+     * Calling it twice with the same `ref` appends, so a group can be built up
+     * from more than one call.
      */
-    buildAnimation(
-        def: Omit<TileAnimationDef, 'start'> & { start?: number | number[] },
-        ref = 'default'
-    ): void {
-        const { start = 0 } = def;
-        if (Array.isArray(start)) {
-            start.forEach(s => this.buildAnimation({ ...def, start: s }, ref));
-            return;
+    buildAnimation({ starts, ...rest }: SpriteAnimationDef, ref = 'default'): void {
+        if (starts.length === 0) {
+            throw new Error(`Sprite.buildAnimation: "${ref}" declares no facings`);
         }
-        const a = createTileAnimation({ ...def, start: start as number });
-        (this._animations[ref] ??= []).push(a);
-        if (this._animation === null) {
-            this._animation = a;
+        const group = (this._animations[ref] ??= []);
+        for (const start of starts) {
+            const a = createTileAnimation({ ...rest, start });
+            group.push(a);
+            if (this._animation === null) {
+                this._animation = a;
+            }
         }
     }
 
@@ -132,6 +149,12 @@ export class Sprite {
             // past the end and leave the sprite with no animation.
             index = Math.min(this._currentDir, group.length - 1);
         }
+        if (index < 0 || index >= group.length) {
+            throw new RangeError(
+                `Sprite.setCurrentAnimation: facing ${index} is outside "${ref}", ` +
+                `which has ${group.length}`
+            );
+        }
         this._currentRef = ref;
         this._animation = group[index];
         this._animation.index = 0;
@@ -154,6 +177,12 @@ export class Sprite {
         if (group === undefined) {
             throw new Error(`Sprite.setDirection: "${ref}" is not in the current animations`);
         }
+        if (direction < 0 || direction >= group.length) {
+            throw new RangeError(
+                `Sprite.setDirection: facing ${direction} is outside "${ref}", ` +
+                `which has ${group.length}. Map an angle onto Sprite.facings first.`
+            );
+        }
         if (group.length > 1 && this._animation !== null) {
             const { index, time, loopDir } = this._animation;
             this.setCurrentAnimation(ref, direction);
@@ -168,6 +197,17 @@ export class Sprite {
     /** Which facing of the current animation group is showing. */
     get direction(): number {
         return this._currentDir;
+    }
+
+    /**
+     * How many facings the current animation group holds.
+     *
+     * 0 before any animation is chosen, 1 for a sprite that looks the same
+     * from every angle. A caller quantising an angle into facings should map
+     * onto this rather than assume a count — see `faceCamera`.
+     */
+    get facings(): number {
+        return this._animations[this._currentRef]?.length ?? 0;
     }
 
     setTileSet(ts: ShadedTileSet | null): void {

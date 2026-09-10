@@ -27,6 +27,7 @@ export { LightSource } from './light/LightSource.js';
 export type { LightSourceState } from './light/LightSource.js';
 
 export { Sprite } from './Sprite.js';
+export type { SpriteAnimationDef } from './Sprite.js';
 export type { RenderedRect } from './Sprite.js';
 export { DebugDisplay } from './DebugDisplay.js';
 

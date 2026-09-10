@@ -6,7 +6,7 @@ import { faceCamera, SPRITE_DIRECTION_COUNT } from '../src/render/spriteFacing.j
 function directional(): Sprite {
     const s = new Sprite();
     s.buildAnimation(
-        { start: [0, 4, 8, 12, 16, 20, 24, 28], length: 4, duration: 100, loop: 1 },
+        { starts: [0, 4, 8, 12, 16, 20, 24, 28], length: 4, duration: 100, loop: 1 },
         'walk'
     );
     s.setCurrentAnimation('walk');
@@ -79,9 +79,72 @@ describe('faceCamera', () => {
 
     it('is a no-op for a sprite with only one facing', () => {
         const s = new Sprite();
-        s.buildAnimation({ start: 0, length: 4, duration: 100, loop: 1 }, 'idle');
+        s.buildAnimation({ starts: [0], length: 4, duration: 100, loop: 1 }, 'idle');
         s.setCurrentAnimation('idle');
         expect(() => faceCamera(s, 0, 100, 0)).not.toThrow();
         expect(s.direction).toBe(0);
+    });
+});
+
+describe('Sprite facings', () => {
+    it('reports how many facings the current group holds', () => {
+        const s = new Sprite();
+        expect(s.facings, 'before any animation is chosen').toBe(0);
+        s.buildAnimation({ starts: [0, 4, 8, 12], length: 2, duration: 100, loop: 1 }, 'walk');
+        s.setCurrentAnimation('walk');
+        expect(s.facings).toBe(4);
+    });
+
+    it('builds one animation per facing, appending across calls', () => {
+        const s = new Sprite();
+        s.buildAnimation({ starts: [0, 4], length: 2, duration: 100, loop: 1 }, 'walk');
+        expect(s.facings).toBe(0);
+        s.setCurrentAnimation('walk');
+        expect(s.facings).toBe(2);
+        s.buildAnimation({ starts: [8, 12], length: 2, duration: 100, loop: 1 }, 'walk');
+        expect(s.facings, 'a second call should append').toBe(4);
+    });
+
+    it('refuses an animation with no facings', () => {
+        const s = new Sprite();
+        expect(() => s.buildAnimation({ starts: [], length: 2, duration: 100, loop: 1 }, 'walk'))
+            .toThrow(/declares no facings/);
+    });
+
+    it('rejects a facing outside the group rather than crashing on undefined', () => {
+        const s = new Sprite();
+        s.buildAnimation({ starts: [0, 4, 8, 12], length: 2, duration: 100, loop: 1 }, 'walk');
+        s.setCurrentAnimation('walk');
+        // Upstream this indexed past the end and then read `.index` off
+        // undefined, so the failure was a TypeError from inside the sprite.
+        expect(() => s.setDirection(4)).toThrow(/outside "walk", which has 4/);
+        expect(() => s.setDirection(-1)).toThrow(RangeError);
+        expect(() => s.setCurrentAnimation('walk', 9)).toThrow(/outside "walk"/);
+    });
+
+    it('quantises onto a sprite drawn from four sides, not a fixed eight', () => {
+        // The case that used to crash: an eight-sector wheel indexing a
+        // four-entry group.
+        const s = new Sprite();
+        s.buildAnimation({ starts: [0, 4, 8, 12], length: 2, duration: 100, loop: 1 }, 'walk');
+        s.setCurrentAnimation('walk');
+        s.x = 0;
+        s.y = 0;
+
+        const seen = new Set<number>();
+        for (let i = 0; i < 64; ++i) {
+            const a = (i / 64) * Math.PI * 2;
+            expect(() => faceCamera(s, 0, Math.cos(a) * 100, Math.sin(a) * 100)).not.toThrow();
+            seen.add(s.direction);
+        }
+        expect(seen).toEqual(new Set([0, 1, 2, 3]));
+    });
+
+    it('leaves a single-facing sprite alone', () => {
+        const s = new Sprite();
+        s.buildAnimation({ starts: [0], length: 4, duration: 100, loop: 1 }, 'idle');
+        s.setCurrentAnimation('idle');
+        expect(s.facings).toBe(1);
+        expect(faceCamera(s, 0, 100, 0)).toBe(0);
     });
 });

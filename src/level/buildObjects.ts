@@ -89,10 +89,20 @@ export async function buildObjects(
         }
 
         // Animations are declared on the tileset, and named; an object picks one.
+        // The file may write one start or an array of them, one per facing;
+        // this is the only place that has to know about both shapes.
         for (const anim of def.animations ?? []) {
-            const a = anim as { id: string; start: number | number[]; length: number; duration: number; loop: number };
+            const a = anim as {
+                id: string; start: number | number[];
+                length: number; duration: number; loop: number;
+            };
             sprite.buildAnimation(
-                { start: a.start, length: a.length, duration: a.duration, loop: a.loop as 0 | 1 | 2 },
+                {
+                    starts: Array.isArray(a.start) ? a.start : [a.start],
+                    length: a.length,
+                    duration: a.duration,
+                    loop: a.loop as 0 | 1 | 2
+                },
                 a.id
             );
         }

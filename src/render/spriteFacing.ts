@@ -1,7 +1,12 @@
 import { angle as angleBetween } from '../core/geometry.js';
 import type { Sprite } from '../Sprite.js';
 
-/** How many facings a directional sprite is drawn from. */
+/**
+ * The facing count the map editor writes, and the conventional default.
+ *
+ * {@link faceCamera} does not assume it: it quantises onto whatever the sprite
+ * actually declares, so a sprite drawn from four sides works too.
+ */
 export const SPRITE_DIRECTION_COUNT = 8;
 
 /**
@@ -28,13 +33,19 @@ export const SPRITE_DIRECTION_COUNT = 8;
 export function faceCamera(
     sprite: Sprite, facing: number, cameraX: number, cameraY: number
 ): number {
+    // Quantise onto the facings this sprite actually has. The original divided
+    // the circle into a fixed eight and masked with `& 7`, which crashed on any
+    // sprite declaring fewer — the mask can produce an index past the end.
+    const sectors = sprite.facings;
+    if (sectors <= 1) {
+        return sprite.direction;
+    }
     const toCamera = angleBetween(cameraX, cameraY, sprite.x, sprite.y);
-    let a = facing + Math.PI / SPRITE_DIRECTION_COUNT - toCamera;
+    let a = facing + Math.PI / sectors - toCamera;
     if (a < 0) {
         a = 2 * Math.PI + a;
     }
-    const direction =
-        ((SPRITE_DIRECTION_COUNT * a) / (2 * Math.PI) | 0) & (SPRITE_DIRECTION_COUNT - 1);
+    const direction = ((sectors * a) / (2 * Math.PI) | 0) % sectors;
     if (direction !== sprite.direction) {
         sprite.setDirection(direction);
     }

@@ -78,7 +78,7 @@ export function buildPortRenderer(spec: SceneSpec): Renderer {
             sprite.h = s.h ?? 0;
             sprite.scale = s.scale ?? 1;
             sprite.flags = s.flags ?? 0;
-            sprite.buildAnimation({ start: s.tile ?? 0, length: 1, duration: 100, loop: 0 });
+            sprite.buildAnimation({ starts: [s.tile ?? 0], length: 1, duration: 100, loop: 0 });
         }
     }
     return rc;
