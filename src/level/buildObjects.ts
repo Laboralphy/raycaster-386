@@ -42,19 +42,23 @@ export interface BuildObjectsOptions {
  * `blueprint.size` are reported, never acted on.
  */
 export async function buildObjects(
-    renderer: Renderer, loaded: LoadedLevel, options: BuildObjectsOptions
+    renderer: Renderer,
+    loaded: LoadedLevel,
+    options: BuildObjectsOptions
 ): Promise<PlacedObject[]> {
     const { blueprints, objects } = loaded.unhandled;
-    const byId = new Map<string | number, RceBlueprint>(blueprints.map(bp => [bp.id, bp]));
+    const byId = new Map<string | number, RceBlueprint>(blueprints.map((bp) => [bp.id, bp]));
     const tilesets = new Map<string | number, ShadedTileSet>();
 
     /** Builds a blueprint's tileset once, shaded unless it is a light source. */
-    const tilesetFor = async (bp: RceBlueprint): Promise<{ ts: ShadedTileSet; def: RceTileset }> => {
+    const tilesetFor = async (
+        bp: RceBlueprint
+    ): Promise<{ ts: ShadedTileSet; def: RceTileset }> => {
         const def = loaded.declaredTilesets.get(bp.tileset);
         if (def === undefined) {
             throw new Error(
                 `buildObjects: blueprint "${String(bp.id)}" refers to tileset ` +
-                `"${String(bp.tileset)}", which the level does not declare`
+                    `"${String(bp.tileset)}", which the level does not declare`
             );
         }
         let ts = tilesets.get(bp.tileset);
@@ -62,7 +66,12 @@ export async function buildObjects(
             // A light source is drawn at full brightness whatever its distance,
             // so shading layers for it would be built and never used.
             const noShading = (bp.fx ?? []).includes(FX_LIGHT_SOURCE);
-            ts = renderer.buildTileSet(await options.loadImage(def.src), def.width, def.height, noShading);
+            ts = renderer.buildTileSet(
+                await options.loadImage(def.src),
+                def.width,
+                def.height,
+                noShading
+            );
             tilesets.set(bp.tileset, ts);
         }
         return { ts, def };
@@ -74,7 +83,7 @@ export async function buildObjects(
         if (bp === undefined) {
             throw new Error(
                 `buildObjects: an object at (${object.x}, ${object.y}) refers to blueprint ` +
-                `"${String(object.blueprint)}", which was neither in the level nor supplied`
+                    `"${String(object.blueprint)}", which was neither in the level nor supplied`
             );
         }
         const { ts, def } = await tilesetFor(bp);
@@ -93,15 +102,18 @@ export async function buildObjects(
         // this is the only place that has to know about both shapes.
         for (const anim of def.animations ?? []) {
             const a = anim as {
-                id: string; start: number | number[];
-                length: number; duration: number; loop: number;
+                id: string;
+                start: number | number[];
+                length: number;
+                duration: number;
+                loop: number;
             };
             sprite.buildAnimation(
                 {
                     starts: Array.isArray(a.start) ? a.start : [a.start],
                     length: a.length,
                     duration: a.duration,
-                    loop: a.loop as 0 | 1 | 2
+                    loop: a.loop as 0 | 1 | 2,
                 },
                 a.id
             );

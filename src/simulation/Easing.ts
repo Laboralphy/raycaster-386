@@ -22,7 +22,7 @@ export type EasingName =
 /** A curve maps progress 0..1 to output 0..1. */
 export type EasingFunction = (v: number) => number;
 
-const smoothstep: EasingFunction = v => v * v * (3 - 2 * v);
+const smoothstep: EasingFunction = (v) => v * v * (3 - 2 * v);
 
 /**
  * The curves, by name.
@@ -32,15 +32,15 @@ const smoothstep: EasingFunction = v => v * v * (3 - 2 * v);
  * which is what makes {@link EasingName} a checkable union.
  */
 export const EASING_FUNCTIONS: Readonly<Record<EasingName, EasingFunction>> = {
-    linear: v => v,
+    linear: (v) => v,
     smoothstep,
-    smoothstepX2: v => smoothstep(smoothstep(v)),
-    smoothstepX3: v => smoothstep(smoothstep(smoothstep(v))),
-    squareAccel: v => v * v,
-    squareDeccel: v => 1 - (1 - v) * (1 - v),
-    cubeAccel: v => v * v * v,
-    cubeDeccel: v => 1 - (1 - v) * (1 - v) * (1 - v),
-    cubeInOut: v => {
+    smoothstepX2: (v) => smoothstep(smoothstep(v)),
+    smoothstepX3: (v) => smoothstep(smoothstep(smoothstep(v))),
+    squareAccel: (v) => v * v,
+    squareDeccel: (v) => 1 - (1 - v) * (1 - v),
+    cubeAccel: (v) => v * v * v,
+    cubeDeccel: (v) => 1 - (1 - v) * (1 - v) * (1 - v),
+    cubeInOut: (v) => {
         if (v < 0.5) {
             const w = 2 * v;
             return w * w * w;
@@ -48,8 +48,8 @@ export const EASING_FUNCTIONS: Readonly<Record<EasingName, EasingFunction>> = {
         const w = (1 - v) * 2;
         return w * w * w;
     },
-    sine: v => Math.sin((v * Math.PI) / 2),
-    cosine: v => 0.5 - Math.cos(-v * Math.PI) * 0.5
+    sine: (v) => Math.sin((v * Math.PI) / 2),
+    cosine: (v) => 0.5 - Math.cos(-v * Math.PI) * 0.5,
 };
 
 export interface EasingOptions {

@@ -1,4 +1,4 @@
-import { Canvas } from '../../src/index.js';
+import { Canvas } from '../../src';
 
 /** Sprite tile size for the demo's patrolling sentinel. */
 export const SENTINEL_TILE_WIDTH = 24;

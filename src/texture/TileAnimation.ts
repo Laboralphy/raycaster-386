@@ -111,7 +111,7 @@ export function createTileAnimation({
     length = 1,
     duration = 100,
     loop = ANIM_LOOP_NONE,
-    iterations = Infinity
+    iterations = Infinity,
 }: TileAnimationDef = {}): TileAnimation {
     const a = new TileAnimation();
     a.base = start;

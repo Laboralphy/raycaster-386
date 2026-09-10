@@ -1,6 +1,6 @@
-import { Vector } from '../../src/index.js';
-import { moveActor } from '../../src/simulation/index.js';
-import type { Actor, Thinker } from '../../src/simulation/index.js';
+import { Vector } from '../../src';
+import { moveActor } from '../../src/simulation';
+import type { Actor, Thinker } from '../../src/simulation';
 import type { DemoContext } from './world.js';
 
 /** Player movement speed, in world units per tick. */

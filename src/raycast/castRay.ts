@@ -53,7 +53,8 @@ export function castRay(
                 tile = resolveTile(ctx.cellCodes, materialCodeOf(scene.cellCode), scene.cellSide);
             }
             if (tile !== null && tileset !== null) {
-                const light = surface === null ? 0 : surface.lightMap[((scene.wallColumn * lmc) / ps) | 0];
+                const light =
+                    surface === null ? 0 : surface.lightMap[((scene.wallColumn * lmc) / ps) | 0];
                 zbuffer.push(createScreenSlice(ctx, scene, xScreen, tileset, tile, light));
             }
             if (scene.resume.active) {

@@ -137,7 +137,7 @@ export class ActorRegistry<C = unknown> {
     get state(): ActorRegistryState {
         return {
             nextId: this._nextId,
-            actors: this._actors.map(a => ({
+            actors: this._actors.map((a) => ({
                 id: a.id,
                 x: a.position.x,
                 y: a.position.y,
@@ -145,8 +145,8 @@ export class ActorRegistry<C = unknown> {
                 angle: a.position.angle,
                 size: a.size,
                 ref: a.ref,
-                data: a.data
-            }))
+                data: a.data,
+            })),
         };
     }
 

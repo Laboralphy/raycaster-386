@@ -42,7 +42,7 @@ export class ForceField {
      * Decay is in place, so a force is weaker the next time it is summed.
      */
     reduceForces(): void {
-        this._forces = this._forces.filter(force => force.v.scale(force.f).length() > 0.01);
+        this._forces = this._forces.filter((force) => force.v.scale(force.f).length() > 0.01);
     }
 
     /** Drops every force. */

@@ -52,7 +52,8 @@ export function computeWallCollisions(
     // The probe on the trailing side is skipped: moving east tests north, east
     // and south but not west. Without this a mobile straddling a door frame is
     // caught by the edge it has already passed and sticks in the doorway.
-    const ignored = (Math.abs(dx) > Math.abs(dy) ? 1 : 0) | (dx > dy || (dx === dy && dx < 0) ? 2 : 0);
+    const ignored =
+        (Math.abs(dx) > Math.abs(dy) ? 1 : 0) | (dx > dy || (dx === dy && dx < 0) ? 2 : 0);
 
     let corrected = false;
     // i is a direction: 0 north, 1 east, 2 south, 3 west.

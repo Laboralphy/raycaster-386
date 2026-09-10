@@ -48,7 +48,7 @@ export class Scheduler {
 
     /** Cancels a command by the id {@link delay} or {@link loop} returned. */
     cancel(id: number): boolean {
-        const i = this._commands.findIndex(c => c.id === id);
+        const i = this._commands.findIndex((c) => c.id === id);
         if (i < 0) {
             return false;
         }

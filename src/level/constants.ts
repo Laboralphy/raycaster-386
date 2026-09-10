@@ -1,9 +1,26 @@
 import {
-    ANIM_LOOP_FORWARD, ANIM_LOOP_NONE, ANIM_LOOP_YOYO,
-    FX_ALPHA_25, FX_ALPHA_50, FX_ALPHA_75, FX_LIGHT_ADD, FX_LIGHT_SOURCE, FX_NONE,
-    PHYS_CURT_DOWN, PHYS_CURT_UP, PHYS_DOOR_DOUBLE, PHYS_DOOR_DOWN, PHYS_DOOR_LEFT,
-    PHYS_DOOR_RIGHT, PHYS_DOOR_UP, PHYS_INVISIBLE_BLOCK, PHYS_NONE, PHYS_OFFSET_BLOCK,
-    PHYS_SECRET_BLOCK, PHYS_TRANSPARENT_BLOCK, PHYS_WALL
+    ANIM_LOOP_FORWARD,
+    ANIM_LOOP_NONE,
+    ANIM_LOOP_YOYO,
+    FX_ALPHA_25,
+    FX_ALPHA_50,
+    FX_ALPHA_75,
+    FX_LIGHT_ADD,
+    FX_LIGHT_SOURCE,
+    FX_NONE,
+    PHYS_CURT_DOWN,
+    PHYS_CURT_UP,
+    PHYS_DOOR_DOUBLE,
+    PHYS_DOOR_DOWN,
+    PHYS_DOOR_LEFT,
+    PHYS_DOOR_RIGHT,
+    PHYS_DOOR_UP,
+    PHYS_INVISIBLE_BLOCK,
+    PHYS_NONE,
+    PHYS_OFFSET_BLOCK,
+    PHYS_SECRET_BLOCK,
+    PHYS_TRANSPARENT_BLOCK,
+    PHYS_WALL,
 } from '../consts.js';
 
 /**
@@ -62,7 +79,7 @@ export const LEVEL_CONSTANTS: Readonly<Record<string, number>> = {
     '@DECAL_ALIGN_RIGHT': DECAL_ALIGN_RIGHT,
     '@DECAL_ALIGN_BOTTOM_LEFT': DECAL_ALIGN_BOTTOM_LEFT,
     '@DECAL_ALIGN_BOTTOM': DECAL_ALIGN_BOTTOM,
-    '@DECAL_ALIGN_BOTTOM_RIGHT': DECAL_ALIGN_BOTTOM_RIGHT
+    '@DECAL_ALIGN_BOTTOM_RIGHT': DECAL_ALIGN_BOTTOM_RIGHT,
 };
 
 /**
@@ -92,7 +109,7 @@ export function resolveConstants<T>(value: T): T {
         return (value.startsWith('@') ? resolveConstant(value) : value) as T;
     }
     if (Array.isArray(value)) {
-        return value.map(item => resolveConstants(item)) as T;
+        return value.map((item) => resolveConstants(item)) as T;
     }
     if (typeof value === 'object' && value !== null) {
         const out: Record<string, unknown> = {};

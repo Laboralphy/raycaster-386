@@ -99,7 +99,7 @@ export function createScene({
     focal,
     screenWidth,
     spacing,
-    storeyScene = null
+    storeyScene = null,
 }: SceneOptions): Scene {
     return {
         camera: {
@@ -108,7 +108,7 @@ export function createScene({
             focal,
             fov: Math.atan2(screenWidth >> 1, focal),
             direction,
-            height
+            height,
         },
         resume: { active: false, xi: 0, yi: 0 },
         exterior: false,
@@ -128,6 +128,6 @@ export function createScene({
         xint: 0,
         yint: 0,
         zbuffer: [],
-        storeyScene
+        storeyScene,
     };
 }

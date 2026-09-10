@@ -10,7 +10,7 @@ import {
     PHYS_OFFSET_BLOCK,
     PHYS_SECRET_BLOCK,
     PHYS_TRANSPARENT_BLOCK,
-    type Face
+    type Face,
 } from '../consts.js';
 import type { MarkerRegistry } from '../core/MarkerRegistry.js';
 import type { RenderContext } from './context.js';
@@ -265,7 +265,7 @@ export function projectRay(
         scene.cellCode = mapData[yi * mapSize + xi];
         scene.wallXed = side === 1;
         let cellSide: Face = (side - 1) as Face;
-        let wallColumn = scene.wallXed ? yint % scene.spacing | 0 : xint % scene.spacing | 0;
+        let wallColumn = scene.wallXed ? (yint % scene.spacing) | 0 : (xint % scene.spacing) | 0;
         if (scene.wallXed && dxi < 0) {
             wallColumn = scene.spacing - wallColumn - 1;
             cellSide = 2;

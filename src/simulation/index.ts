@@ -15,14 +15,26 @@ export { TypedEmitter } from './TypedEmitter.js';
 export type { Listener } from './TypedEmitter.js';
 export { DoorContext } from './DoorContext.js';
 export type {
-    DoorContextOptions, DoorData, DoorState, DoorEvents, DoorCloseCheck
+    DoorContextOptions,
+    DoorData,
+    DoorState,
+    DoorEvents,
+    DoorCloseCheck,
 } from './DoorContext.js';
 export { DoorManager } from './DoorManager.js';
 export type { DoorCellUpdate, DoorManagerStateEntry } from './DoorManager.js';
 export { DoorPolicy } from './DoorPolicy.js';
-export type { DoorPolicyOptions, DoorPolicyEvents, DoorMetrics, DoorPolicyState } from './DoorPolicy.js';
+export type {
+    DoorPolicyOptions,
+    DoorPolicyEvents,
+    DoorMetrics,
+    DoorPolicyState,
+} from './DoorPolicy.js';
 export {
-    forEachNeighbor, CELL_NEIGHBOR_SIDE, CELL_NEIGHBOR_CORNER, CELL_NEIGHBOR_SELF
+    forEachNeighbor,
+    CELL_NEIGHBOR_SIDE,
+    CELL_NEIGHBOR_CORNER,
+    CELL_NEIGHBOR_SELF,
 } from './neighbors.js';
 export { computeWallCollisions } from './wallCollider.js';
 export type { WallCollisionFlags, WallCollisionResult, SolidTest } from './wallCollider.js';

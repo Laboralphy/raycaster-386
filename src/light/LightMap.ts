@@ -60,7 +60,7 @@ export class LightMap {
     setSize(w: number, h: number): void {
         this._grid.setSize(w, h, () => []);
         this._updated.clear();
-        this._sources.forEach(s => s.invalidate());
+        this._sources.forEach((s) => s.invalidate());
         this.invalidate();
     }
 
@@ -96,7 +96,7 @@ export class LightMap {
 
     private updatePixel(x: number, y: number, value: number, id: number): void {
         const cell = this._grid.cell(x, y);
-        const p = cell.find(gp => gp.id === id);
+        const p = cell.find((gp) => gp.id === id);
         if (p) {
             if (value !== p.v) {
                 p.v = value;
@@ -110,7 +110,7 @@ export class LightMap {
     }
 
     private removePixel(x: number, y: number, id: number): void {
-        const p = this._grid.cell(x, y).find(gp => gp.id === id);
+        const p = this._grid.cell(x, y).find((gp) => gp.id === id);
         if (p) {
             p.v = 0;
             p.s = PIXEL_STATE_DEAD;
@@ -236,7 +236,7 @@ export class LightMap {
 
     clearSources(): void {
         // Iterate a copy: removeSource splices the live array.
-        this._sources.slice().forEach(source => this.removeSource(source));
+        this._sources.slice().forEach((source) => this.removeSource(source));
     }
 
     /**

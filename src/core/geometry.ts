@@ -19,8 +19,13 @@ export function squareDistance(x1: number, y1: number, x2: number, y2: number): 
  * True if the circle (xc, yc, r) overlaps the rectangle (xr, yr, wr, hr).
  */
 export function circleInRect(
-    xc: number, yc: number, r: number,
-    xr: number, yr: number, wr: number, hr: number
+    xc: number,
+    yc: number,
+    r: number,
+    xr: number,
+    yr: number,
+    wr: number,
+    hr: number
 ): boolean {
     const xNearest = Math.max(xr, Math.min(xc, xr + wr));
     const yNearest = Math.max(yr, Math.min(yc, yr + hr));

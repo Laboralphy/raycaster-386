@@ -5,7 +5,7 @@ import {
     DOOR_PHASE_OPEN,
     DOOR_PHASE_OPENING,
     DOOR_SECURITY_INTERVAL,
-    type DoorPhase
+    type DoorPhase,
 } from './consts.js';
 import { Easing, type EasingFunction, type EasingName } from './Easing.js';
 import { TypedEmitter } from './TypedEmitter.js';
@@ -97,7 +97,7 @@ export class DoorContext {
         delayDuration = 0,
         offsetMax = 0,
         openFunction = 'smoothstep',
-        closeFunction = null
+        closeFunction = null,
     }: DoorContextOptions = {}) {
         this._slidingDuration = slidingDuration;
         this._maintainDuration = maintainDuration;

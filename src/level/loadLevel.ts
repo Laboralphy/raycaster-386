@@ -1,11 +1,24 @@
 import { MapHelper } from '../map/MapHelper.js';
-import type { BlockLight, BuiltMaterial, FaceDef, LevelMap, MaterialDef } from '../map/MapHelper.js';
+import type {
+    BlockLight,
+    BuiltMaterial,
+    FaceDef,
+    LevelMap,
+    MaterialDef,
+} from '../map/MapHelper.js';
 import type { Face } from '../consts.js';
 import type { LightHandle, Renderer } from '../Renderer.js';
 import { resolveConstants } from './constants.js';
 import type {
-    DecalAlign, RceBlueprint, RceDecal, RceDecalFace, RceLevel, RceObject,
-    RceStartPoint, RceTag, RceTileset
+    DecalAlign,
+    RceBlueprint,
+    RceDecal,
+    RceDecalFace,
+    RceLevel,
+    RceObject,
+    RceStartPoint,
+    RceTag,
+    RceTileset,
 } from './types.js';
 
 /** The only level format version this loader accepts. */
@@ -135,10 +148,10 @@ function toLevelMap(level: RceLevel['level']): LevelMap {
                     s: toFaceDef(f.s),
                     w: toFaceDef(f.w),
                     f: toFaceDef(f.f),
-                    c: toFaceDef(f.c)
-                }
+                    c: toFaceDef(f.c),
+                },
             };
-        })
+        }),
     };
 }
 
@@ -151,8 +164,11 @@ function toLevelMap(level: RceLevel['level']): LevelMap {
  * rather than argued.
  */
 export function decalOffset(
-    align: DecalAlign, surfaceWidth: number, surfaceHeight: number,
-    tileWidth: number, tileHeight: number
+    align: DecalAlign,
+    surfaceWidth: number,
+    surfaceHeight: number,
+    tileWidth: number,
+    tileHeight: number
 ): { x: number; y: number } {
     const xs = [0, (surfaceWidth - tileWidth) >> 1, surfaceWidth - tileWidth];
     const ys = [0, (surfaceHeight - tileHeight) >> 1, surfaceHeight - tileHeight];
@@ -163,7 +179,10 @@ export function decalOffset(
 
 /** Draws one tile of a tileset onto a surface, aligned within it. */
 function drawDecal(
-    canvas: HTMLCanvasElement, ts: LoadedTileset, tile: number, align: DecalAlign
+    canvas: HTMLCanvasElement,
+    ts: LoadedTileset,
+    tile: number,
+    align: DecalAlign
 ): void {
     const at = decalOffset(align, canvas.width, canvas.height, ts.width, ts.height);
     const context = canvas.getContext('2d');
@@ -172,8 +191,14 @@ function drawDecal(
     }
     context.drawImage(
         ts.image,
-        tile * ts.width, 0, ts.width, ts.height,
-        at.x, at.y, ts.width, ts.height
+        tile * ts.width,
+        0,
+        ts.width,
+        ts.height,
+        at.x,
+        at.y,
+        ts.width,
+        ts.height
     );
 }
 
@@ -191,7 +216,9 @@ function drawDecal(
  * source of truth.
  */
 export async function loadLevel(
-    renderer: Renderer, level: RceLevel, options: LoadLevelOptions
+    renderer: Renderer,
+    level: RceLevel,
+    options: LoadLevelOptions
 ): Promise<LoadedLevel> {
     const { loadImage, validate, ignoreVersion = false, startpoint = 0 } = options;
 
@@ -199,7 +226,9 @@ export async function loadLevel(
     // it half-configured, with some materials registered and some not.
     validate?.(level);
     if (!ignoreVersion && level.version !== RCE_VERSION) {
-        throw new Error(`loadLevel: expected version ${RCE_VERSION}, got "${String(level.version)}"`);
+        throw new Error(
+            `loadLevel: expected version ${RCE_VERSION}, got "${String(level.version)}"`
+        );
     }
 
     // Caller-supplied blueprints and tilesets are appended before resolution,
@@ -207,7 +236,7 @@ export async function loadLevel(
     const data = resolveConstants({
         ...level,
         blueprints: [...(level.blueprints ?? []), ...(options.blueprints ?? [])],
-        tilesets: [...(level.tilesets ?? []), ...(options.tilesets ?? [])]
+        tilesets: [...(level.tilesets ?? []), ...(options.tilesets ?? [])],
     });
     const { metrics, textures } = data.level;
 
@@ -222,7 +251,7 @@ export async function loadLevel(
             shades: shades ?? renderer.shading.shades,
             color,
             filter,
-            brightness
+            brightness,
         });
         renderer.shadingFactor = data.shading.factor;
     }
@@ -240,7 +269,7 @@ export async function loadLevel(
     // Decals. A tileset is decoded the first time a decal names it, so a level
     // carrying a sheet only its entities use costs nothing here.
     const declared = new Map<string | number, RceTileset>(
-        (data.tilesets ?? []).map(ts => [ts.id, ts])
+        (data.tilesets ?? []).map((ts) => [ts.id, ts])
     );
     const tilesets = new Map<string | number, LoadedTileset>();
 
@@ -251,14 +280,16 @@ export async function loadLevel(
         }
         const def = declared.get(id);
         if (def === undefined) {
-            throw new Error(`loadLevel: a decal refers to tileset "${String(id)}", which the level does not declare`);
+            throw new Error(
+                `loadLevel: a decal refers to tileset "${String(id)}", which the level does not declare`
+            );
         }
         const built: LoadedTileset = {
             id,
             image: await loadImage(def.src),
             width: def.width,
             height: def.height,
-            animations: def.animations ?? []
+            animations: def.animations ?? [],
         };
         tilesets.set(id, built);
         return built;
@@ -279,7 +310,7 @@ export async function loadLevel(
         }
     }
 
-    const lightsources = (data.lightsources ?? []).map(ls =>
+    const lightsources = (data.lightsources ?? []).map((ls) =>
         renderer.addLightSource(ls.x, ls.y, ls.r0, ls.r1, ls.v)
     );
 
@@ -297,7 +328,7 @@ export async function loadLevel(
             blueprints: data.blueprints ?? [],
             objects: data.objects ?? [],
             tags: data.tags ?? [],
-            camera: data.camera
-        }
+            camera: data.camera,
+        },
     };
 }

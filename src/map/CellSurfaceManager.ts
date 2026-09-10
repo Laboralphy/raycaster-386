@@ -6,7 +6,7 @@ import {
     FACE_WEST,
     SURFACE_LIGHTMAP_SCALE,
     type Face,
-    type WallFace
+    type WallFace,
 } from '../consts.js';
 import { context2d } from '../core/canvas.js';
 import { ShadedTileSet } from '../texture/ShadedTileSet.js';
@@ -105,7 +105,7 @@ export class CellSurfaceManager {
                         tileset: null,
                         imageData: null,
                         imageData32: null,
-                        lightMap: lightMaps.subarray(i * lmc, (i + 1) * lmc)
+                        lightMap: lightMaps.subarray(i * lmc, (i + 1) * lmc),
                     };
                 }
             }
@@ -198,7 +198,7 @@ export class CellSurfaceManager {
             s[base].tileset,
             s[base + 1].tileset,
             s[base + 2].tileset,
-            s[base + 3].tileset
+            s[base + 3].tileset,
         ];
         if (clockwise) {
             tilesets.push(tilesets.shift() as ShadedTileSet | null);
@@ -240,8 +240,13 @@ export class CellSurfaceManager {
      * the shaded pixels for the flat rasteriser to sample directly.
      */
     shadeSurface(
-        x: number, y: number, face: Face,
-        shades: number, fogColor: string, filter: string | null, brightness: number
+        x: number,
+        y: number,
+        face: Face,
+        shades: number,
+        fogColor: string,
+        filter: string | null,
+        brightness: number
     ): void {
         const surface = this.getSurface(x, y, face);
         if (surface === null) {
@@ -267,14 +272,24 @@ export class CellSurfaceManager {
      * Recomputes every painted surface. Only worth calling when the shading
      * settings themselves change.
      */
-    shadeAllSurfaces(shades: number, fogColor: string, filter: string | null, brightness: number): void {
+    shadeAllSurfaces(
+        shades: number,
+        fogColor: string,
+        filter: string | null,
+        brightness: number
+    ): void {
         const s = this._surfaces;
         for (let i = 0, l = s.length; i < l; ++i) {
             const surface = s[i];
             if (surface.tileset !== null) {
                 this.shadeSurface(
-                    surface.x, surface.y, (i % FACE_COUNT) as Face,
-                    shades, fogColor, filter, brightness
+                    surface.x,
+                    surface.y,
+                    (i % FACE_COUNT) as Face,
+                    shades,
+                    fogColor,
+                    filter,
+                    brightness
                 );
             }
         }

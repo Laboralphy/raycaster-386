@@ -5,7 +5,7 @@ import {
     CELL_PHYS_MASK,
     CELL_PHYS_SHIFT,
     PHYS_WALL,
-    type PhysCode
+    type PhysCode,
 } from '../consts.js';
 
 /**

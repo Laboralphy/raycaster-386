@@ -47,12 +47,12 @@ export class DoorManager {
     }
 
     get state(): DoorManagerStateEntry[] {
-        return this._doors.map(d => {
+        return this._doors.map((d) => {
             const entry: DoorManagerStateEntry = {
                 ...d.state,
                 x: d.data.x,
                 y: d.data.y,
-                autoclose: d.data.autoclose
+                autoclose: d.data.autoclose,
             };
             const child = d.data.child;
             if (child !== undefined) {
@@ -64,7 +64,7 @@ export class DoorManager {
 
     /** The door at a cell, if one is live there. */
     getDoorContext(x: number, y: number): DoorContext | undefined {
-        return this._doors.find(d => d.data.x === x && d.data.y === y);
+        return this._doors.find((d) => d.data.x === x && d.data.y === y);
     }
 
     /**
@@ -82,7 +82,7 @@ export class DoorManager {
                 existing.dispose();
             }
         }
-        this._doors = this._doors.filter(d => !(d.data.x === x && d.data.y === y));
+        this._doors = this._doors.filter((d) => !(d.data.x === x && d.data.y === y));
         this._doors.push(dc);
     }
 
@@ -137,16 +137,16 @@ export class DoorManager {
      * @returns one entry per door, including any that finished this tick.
      */
     process(): DoorCellUpdate[] {
-        const result = this._doors.map(dc => {
+        const result = this._doors.map((dc) => {
             dc.process();
             return {
                 x: dc.data.x,
                 y: dc.data.y,
                 phys: dc.isOpen() ? PHYS_NONE : dc.data.phys,
-                offset: dc.offset
+                offset: dc.offset,
             };
         });
-        this._doors = this._doors.filter(dc => !dc.isDone());
+        this._doors = this._doors.filter((dc) => !dc.isDone());
         return result;
     }
 }

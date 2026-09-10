@@ -27,7 +27,7 @@ export type ZSlice = [
     dw: number,
     dh: number,
     z: number,
-    fx: number
+    fx: number,
 ];
 
 /**
@@ -78,11 +78,26 @@ export function optimizeBuffer(zb: ZSlice[]): ZSlice[] {
 
     for (let i = 0; i < zbl; ++i) {
         const b = zb[i];
-        if (b[10] === last[10] && b[0] === last[0] && b[1] === last[1] && abs(b[9] - last[9]) < MERGE_Z_TOLERANCE) {
+        if (
+            b[10] === last[10] &&
+            b[0] === last[0] &&
+            b[1] === last[1] &&
+            abs(b[9] - last[9]) < MERGE_Z_TOLERANCE
+        ) {
             ++lastN;
-        } else if (b[10] === last2[10] && b[0] === last2[0] && b[1] === last2[1] && abs(b[9] - last2[9]) < MERGE_Z_TOLERANCE) {
+        } else if (
+            b[10] === last2[10] &&
+            b[0] === last2[0] &&
+            b[1] === last2[1] &&
+            abs(b[9] - last2[9]) < MERGE_Z_TOLERANCE
+        ) {
             ++last2N;
-        } else if (b[10] === last3[10] && b[0] === last3[0] && b[1] === last3[1] && abs(b[9] - last3[9]) < MERGE_Z_TOLERANCE) {
+        } else if (
+            b[10] === last3[10] &&
+            b[0] === last3[0] &&
+            b[1] === last3[1] &&
+            abs(b[9] - last3[9]) < MERGE_Z_TOLERANCE
+        ) {
             ++last3N;
         } else {
             last3[7] = last3N;

@@ -3,23 +3,44 @@ import {
     PHYS_INVISIBLE_BLOCK,
     PHYS_NONE,
     PHYS_TRANSPARENT_BLOCK,
-    type Face
+    type Face,
 } from './consts.js';
-import { context2d, createCanvas, getData, resize, setImageSmoothing, type ImageSource } from './core/canvas.js';
+import {
+    context2d,
+    createCanvas,
+    getData,
+    resize,
+    setImageSmoothing,
+    type ImageSource,
+} from './core/canvas.js';
 import { MarkerRegistry } from './core/MarkerRegistry.js';
 import { CellMap, type ReadonlyCellMap } from './core/CellMap.js';
 import { CellSurfaceManager } from './map/CellSurfaceManager.js';
 import { LightMap } from './light/LightMap.js';
 import { LightSource } from './light/LightSource.js';
 import { ShadedTileSet } from './texture/ShadedTileSet.js';
-import { TileAnimation, createTileAnimation, type TileAnimationDef } from './texture/TileAnimation.js';
+import {
+    TileAnimation,
+    createTileAnimation,
+    type TileAnimationDef,
+} from './texture/TileAnimation.js';
 import { Sprite } from './Sprite.js';
 import { DebugDisplay } from './DebugDisplay.js';
-import { resolveTile, type CellCodes, type RenderContext, type SurfaceTile } from './raycast/context.js';
+import {
+    resolveTile,
+    type CellCodes,
+    type RenderContext,
+    type SurfaceTile,
+} from './raycast/context.js';
 import { castRay } from './raycast/castRay.js';
 import { createScene, type AimedCell, type Scene } from './raycast/Scene.js';
 import { compareSlices, optimizeBuffer } from './raycast/ZBuffer.js';
-import { createFlatContext, renderFlats, resetFlatContext, type FlatContext } from './render/renderFlats.js';
+import {
+    createFlatContext,
+    renderFlats,
+    resetFlatContext,
+    type FlatContext,
+} from './render/renderFlats.js';
 import { renderScreenSliceBuffer } from './render/renderScreenSlice.js';
 import { renderSprites } from './render/renderSprites.js';
 import { renderBackground } from './render/renderBackground.js';
@@ -32,7 +53,7 @@ const enum Dirty {
     /** Re-shade every tileset and painted surface. */
     Shading = 1 << 1,
     /** Drop the cached flat pixel data. */
-    Flats = 1 << 2
+    Flats = 1 << 2,
 }
 
 export interface ScreenSettings {
@@ -94,7 +115,12 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 const DEFAULT_SCREEN: ScreenSettings = { width: 256, height: 256 };
 const DEFAULT_METRICS: MetricsSettings = { spacing: 64, height: 96 };
-const DEFAULT_SHADING: ShadingSettings = { shades: 16, color: 'black', filter: null, brightness: 0 };
+const DEFAULT_SHADING: ShadingSettings = {
+    shades: 16,
+    color: 'black',
+    filter: null,
+    brightness: 0,
+};
 
 /**
  * Renders a raycast world into a canvas.
@@ -296,7 +322,12 @@ export class Renderer {
      *
      * @param noShading a sprite that should not dim with distance
      */
-    buildTileSet(image: ImageSource, width: number, height: number, noShading = false): ShadedTileSet {
+    buildTileSet(
+        image: ImageSource,
+        width: number,
+        height: number,
+        noShading = false
+    ): ShadedTileSet {
         const ts = new ShadedTileSet();
         ts.shading = !noShading;
         ts.setShadingLayerCount(this._shading.shades);
@@ -307,8 +338,8 @@ export class Renderer {
 
     /** Drops tilesets no sprite still references. */
     removeUnusedTileSets(): void {
-        const used = new Set(this._sprites.map(s => s.getTileSet()));
-        this._tilesets = this._tilesets.filter(ts => used.has(ts));
+        const used = new Set(this._sprites.map((s) => s.getTileSet()));
+        this._tilesets = this._tilesets.filter((ts) => used.has(ts));
     }
 
     /** Approximate bytes held by every tileset. */
@@ -316,7 +347,7 @@ export class Renderer {
         return {
             // The original called getConsumedBytes(), which does not exist on
             // ShadedTileSet, so this method always threw.
-            tilesets: this._tilesets.reduce((sum, ts) => sum + ts.getMemoryUsage(), 0)
+            tilesets: this._tilesets.reduce((sum, ts) => sum + ts.getMemoryUsage(), 0),
         };
     }
 
@@ -354,7 +385,10 @@ export class Renderer {
      * A face may be a tileset index, a {@link TileAnimation}, or null to draw
      * nothing there.
      */
-    registerCellMaterial(code: number, { n = null, e = null, s = null, w = null, f = null, c = null }: CellMaterial): void {
+    registerCellMaterial(
+        code: number,
+        { n = null, e = null, s = null, w = null, f = null, c = null }: CellMaterial
+    ): void {
         this._cellCodes[code] = [w, s, e, n, f, c];
         this.shareWithStorey();
     }
@@ -451,7 +485,7 @@ export class Renderer {
             cellCodes: this._cellCodes,
             context: this._renderContext,
             canvas: this._renderCanvas,
-            offsetTop: this._offsetTop
+            offsetTop: this._offsetTop,
         });
     }
 
@@ -478,17 +512,41 @@ export class Renderer {
         let wr0 = r0;
         let wr1 = r1;
         return {
-            get x() { return wx; },
-            set x(value: number) { wx = value; source.x = (value * r) | 0; },
-            get y() { return wy; },
-            set y(value: number) { wy = value; source.y = (value * r) | 0; },
-            get r0() { return wr0; },
-            set r0(value: number) { wr0 = value; source.r0 = (value * r) | 0; },
-            get r1() { return wr1; },
-            set r1(value: number) { wr1 = value; source.r1 = (value * r) | 0; },
-            get v() { return source.v; },
-            set v(value: number) { source.v = value; },
-            remove: () => lightMap.removeSource(source)
+            get x() {
+                return wx;
+            },
+            set x(value: number) {
+                wx = value;
+                source.x = (value * r) | 0;
+            },
+            get y() {
+                return wy;
+            },
+            set y(value: number) {
+                wy = value;
+                source.y = (value * r) | 0;
+            },
+            get r0() {
+                return wr0;
+            },
+            set r0(value: number) {
+                wr0 = value;
+                source.r0 = (value * r) | 0;
+            },
+            get r1() {
+                return wr1;
+            },
+            set r1(value: number) {
+                wr1 = value;
+                source.r1 = (value * r) | 0;
+            },
+            get v() {
+                return source.v;
+            },
+            set v(value: number) {
+                source.v = value;
+            },
+            remove: () => lightMap.removeSource(source),
         };
     }
 
@@ -675,7 +733,7 @@ export class Renderer {
                 shadingFactor: 0,
                 offsetTop: 0,
                 stretch: false,
-                firstFloor: this._firstFloor
+                firstFloor: this._firstFloor,
             } as RenderContext;
         }
         const m = c as Mutable<RenderContext>;
@@ -702,7 +760,7 @@ export class Renderer {
             focal: this._focal,
             screenWidth: this._screen.width,
             spacing: this._metrics.spacing,
-            storeyScene: this._storey?.createSceneFor(x, y, angle, height + 2) ?? null
+            storeyScene: this._storey?.createSceneFor(x, y, angle, height + 2) ?? null,
         });
     }
 
@@ -754,7 +812,7 @@ export class Renderer {
                     yCell: scene.yCell,
                     x: scene.xint,
                     y: scene.yint,
-                    side: scene.cellSide
+                    side: scene.cellSide,
                 };
             } else {
                 castRay(ctx, scene, xCamera, yCamera, bx, by, i, scanCells, zbuffer, exclusion);

@@ -101,7 +101,11 @@ export class TagTriggers {
     }
 
     private emit(
-        type: keyof TagTriggerEvents, id: number, actor: ActorId, x: number, y: number
+        type: keyof TagTriggerEvents,
+        id: number,
+        actor: ActorId,
+        x: number,
+        y: number
     ): void {
         const [command = '', ...parameters] = this.grid.commandOf(id);
         this.events.emit(type, {
@@ -113,7 +117,7 @@ export class TagTriggers {
             parameters,
             remove: () => {
                 this.grid.removeTagRegion(x, y, id);
-            }
+            },
         });
     }
 }

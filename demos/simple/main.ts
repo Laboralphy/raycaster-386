@@ -1,35 +1,14 @@
-import { Canvas } from '../../src/index.js';
-import { buildSentinelAtlas } from './spriteAtlas.js';
-import { TEXTURES } from './level.js';
-import { emptyInput, World, type Input } from './world.js';
+import { Canvas } from '../../src';
+import { buildSentinelAtlas } from './spriteAtlas';
+import { TEXTURES } from './level';
+import { World } from './world';
+import { InputManager } from './input';
 
 /** Internal render resolution. The canvas is scaled up by CSS. */
 const WIDTH = 320;
 const HEIGHT = 200;
 /** Simulation rate. Doors are written in ticks, so this must be fixed. */
 const TICK_MS = 1000 / 60;
-/** Mouse sensitivity, radians per pixel of movement. */
-const MOUSE_SENSITIVITY = 0.0025;
-
-const held = new Set<string>();
-let mouseTurn = 0;
-let usePressed = false;
-
-function readInput(): Input {
-    const input = emptyInput();
-    if (held.has('w') || held.has('arrowup')) {input.forward += 1;}
-    if (held.has('s') || held.has('arrowdown')) {input.forward -= 1;}
-    if (held.has('a')) {input.strafe -= 1;}
-    if (held.has('d')) {input.strafe += 1;}
-    if (held.has('arrowleft')) {input.turn -= 1;}
-    if (held.has('arrowright')) {input.turn += 1;}
-    // Mouse look is applied as a one-off rotation, not a rate.
-    input.turn += mouseTurn / 0.045;
-    mouseTurn = 0;
-    input.use = usePressed;
-    usePressed = false;
-    return input;
-}
 
 function hud(world: World, fps: number): string {
     const c = world.cell;
@@ -38,7 +17,7 @@ function hud(world: World, fps: number): string {
         `${fps.toFixed(0)} fps`,
         `cell ${c.x},${c.y}`,
         `doors ${world.doors.contexts.length}`,
-        door ? `[E] open door at ${door.x},${door.y}` : ''
+        door ? `[E] open door at ${door.x},${door.y}` : '',
     ]
         .filter(Boolean)
         .join('   ');
@@ -48,6 +27,8 @@ async function main(): Promise<void> {
     const canvas = document.getElementById('screen') as HTMLCanvasElement;
     const status = document.getElementById('status') as HTMLElement;
     const readout = document.getElementById('readout') as HTMLElement;
+
+    const im = new InputManager();
 
     const world = new World();
     world.setScreen(WIDTH, HEIGHT);
@@ -63,30 +44,7 @@ async function main(): Promise<void> {
     const target = canvas.getContext('2d') as CanvasRenderingContext2D;
     target.imageSmoothingEnabled = false;
 
-    window.addEventListener('keydown', e => {
-        const key = e.key.toLowerCase();
-        held.add(key);
-        if (key === 'e' || key === ' ') {
-            usePressed = true;
-            e.preventDefault();
-        }
-        if (key.startsWith('arrow')) {e.preventDefault();}
-    });
-    window.addEventListener('keyup', e => held.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => held.clear());
-
-    canvas.addEventListener('click', () => {
-        if (document.pointerLockElement !== canvas) {
-            void canvas.requestPointerLock();
-        } else {
-            usePressed = true;
-        }
-    });
-    document.addEventListener('mousemove', e => {
-        if (document.pointerLockElement === canvas) {
-            mouseTurn += e.movementX * MOUSE_SENSITIVITY;
-        }
-    });
+    im.plugListeners(canvas);
 
     let previous = performance.now();
     let carry = 0;
@@ -101,7 +59,7 @@ async function main(): Promise<void> {
         carry += elapsed;
         let steps = 0;
         while (carry >= TICK_MS && steps < 8) {
-            world.update(readInput());
+            world.update(im.readInput());
             carry -= TICK_MS;
             ++steps;
         }

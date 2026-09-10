@@ -74,7 +74,7 @@ export function renderSprite(ctx: RenderContext, scene: Scene, sprite: Sprite): 
         dw0,
         dh0,
         f * SPRITE_Z_SCALE,
-        sprite.flags
+        sprite.flags,
     ]);
 
     const lr = sprite.lastRendered;

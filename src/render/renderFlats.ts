@@ -37,7 +37,7 @@ export function createFlatContext(): FlatContext {
         renderSurface: null,
         renderSurface32: null,
         floorTiles: new Int32Array(0),
-        ceilTiles: new Int32Array(0)
+        ceilTiles: new Int32Array(0),
     };
 }
 
@@ -219,15 +219,15 @@ export function renderFlats(
                         let drawn = 0;
                         lmCorr = lmData[((lmc * fy) >> psh) * lmWidth + ((lmc * fx) >> psh)];
                         yOfsCorr = Math.max(0, yOfs - lmCorr);
-    
+
                         if (floorPixels !== null) {
-                            ofsSrc = (((fy & psm) + yOfsCorr * ps) * ps + (fx & psm));
+                            ofsSrc = ((fy & psm) + yOfsCorr * ps) * ps + (fx & psm);
                             aRenderSurf[ofsDst] = floorPixels[ofsSrc];
                             drawn += 1;
                         }
                         if (ceilPixels !== null) {
                             if (drawn === 0) {
-                                ofsSrc = (((fy & psm) + yOfsCorr * ps) * ps + (fx & psm));
+                                ofsSrc = ((fy & psm) + yOfsCorr * ps) * ps + (fx & psm);
                             }
                             aRenderSurf[ofsDstCeil] = ceilPixels[ofsSrc];
                             drawn += 2;
@@ -237,8 +237,8 @@ export function renderFlats(
                                 xOfs = floorTiles[code];
                                 if (xOfs >= 0) {
                                     ofsSrc =
-                                        (((fy & psm) + yOfsCorr * ps) * nFloorWidth +
-                                            ((fx & psm) + xOfs * ps));
+                                        ((fy & psm) + yOfsCorr * ps) * nFloorWidth +
+                                        ((fx & psm) + xOfs * ps);
                                     aRenderSurf[ofsDst] = aFloorSurf[ofsSrc];
                                 }
                             }
@@ -246,8 +246,8 @@ export function renderFlats(
                                 xOfs = ceilTiles[code];
                                 if (xOfs >= 0) {
                                     ofsSrc =
-                                        (((fy & psm) + yOfsCorr * ps) * nFloorWidth +
-                                            ((fx & psm) + xOfs * ps));
+                                        ((fy & psm) + yOfsCorr * ps) * nFloorWidth +
+                                        ((fx & psm) + xOfs * ps);
                                     aRenderSurf[ofsDstCeil] = aFloorSurf[ofsSrc];
                                 }
                             }
@@ -278,17 +278,18 @@ export function renderFlats(
                         }
                         // 0 = no decal, 1 = floor decal, 2 = ceiling decal, 3 = both
                         let drawn = 0;
-                        lmCorr = lmData[(((lmc * fy) / ps) | 0) * lmWidth + (((lmc * fx) / ps) | 0)];
+                        lmCorr =
+                            lmData[(((lmc * fy) / ps) | 0) * lmWidth + (((lmc * fx) / ps) | 0)];
                         yOfsCorr = Math.max(0, yOfs - lmCorr);
-    
+
                         if (floorPixels !== null) {
-                            ofsSrc = ((((fy % ps) | 0) + yOfsCorr * ps) * ps + ((fx % ps) | 0));
+                            ofsSrc = (((fy % ps) | 0) + yOfsCorr * ps) * ps + ((fx % ps) | 0);
                             aRenderSurf[ofsDst] = floorPixels[ofsSrc];
                             drawn += 1;
                         }
                         if (ceilPixels !== null) {
                             if (drawn === 0) {
-                                ofsSrc = ((((fy % ps) | 0) + yOfsCorr * ps) * ps + ((fx % ps) | 0));
+                                ofsSrc = (((fy % ps) | 0) + yOfsCorr * ps) * ps + ((fx % ps) | 0);
                             }
                             aRenderSurf[ofsDstCeil] = ceilPixels[ofsSrc];
                             drawn += 2;
@@ -298,8 +299,8 @@ export function renderFlats(
                                 xOfs = floorTiles[code];
                                 if (xOfs >= 0) {
                                     ofsSrc =
-                                        ((((fy % ps) | 0) + yOfsCorr * ps) * nFloorWidth +
-                                            (((fx % ps) | 0) + xOfs * ps));
+                                        (((fy % ps) | 0) + yOfsCorr * ps) * nFloorWidth +
+                                        (((fx % ps) | 0) + xOfs * ps);
                                     aRenderSurf[ofsDst] = aFloorSurf[ofsSrc];
                                 }
                             }
@@ -307,8 +308,8 @@ export function renderFlats(
                                 xOfs = ceilTiles[code];
                                 if (xOfs >= 0) {
                                     ofsSrc =
-                                        ((((fy % ps) | 0) + yOfsCorr * ps) * nFloorWidth +
-                                            (((fx % ps) | 0) + xOfs * ps));
+                                        (((fy % ps) | 0) + yOfsCorr * ps) * nFloorWidth +
+                                        (((fx % ps) | 0) + xOfs * ps);
                                     aRenderSurf[ofsDstCeil] = aFloorSurf[ofsSrc];
                                 }
                             }
@@ -374,21 +375,22 @@ export function renderFlats(
                             cellY = fy64;
                             floorPixels =
                                 fx64 < csmW && fy64 < csmH
-                                    ? surfaces[(fy64 * csmW + fx64) * FACE_COUNT + FACE_FLOOR].imageData32
+                                    ? surfaces[(fy64 * csmW + fx64) * FACE_COUNT + FACE_FLOOR]
+                                          .imageData32
                                     : null;
                             code = mapData[fy64 * mapSize + fx64] & 0xfff;
                         }
                         lmCorr = lmData[((lmc * fy) >> psh) * lmWidth + ((lmc * fx) >> psh)];
                         yOfsCorr = Math.max(0, yOfs - lmCorr);
                         if (floorPixels !== null) {
-                            ofsSrc = (((fy & psm) + yOfsCorr * ps) * ps + (fx & psm));
+                            ofsSrc = ((fy & psm) + yOfsCorr * ps) * ps + (fx & psm);
                             aRenderSurf[ofsDst] = floorPixels[ofsSrc];
                         } else {
                             xOfs = floorTiles[code];
                             if (xOfs >= 0) {
                                 ofsSrc =
-                                    (((fy & psm) + yOfsCorr * ps) * nFloorWidth +
-                                        ((fx & psm) + xOfs * ps));
+                                    ((fy & psm) + yOfsCorr * ps) * nFloorWidth +
+                                    ((fx & psm) + xOfs * ps);
                                 aRenderSurf[ofsDst] = aFloorSurf[ofsSrc];
                             }
                         }
@@ -401,23 +403,25 @@ export function renderFlats(
                             ceilCellY = fy64;
                             ceilPixels =
                                 fx64 < csmW && fy64 < csmH
-                                    ? surfaces[(fy64 * csmW + fx64) * FACE_COUNT + FACE_CEILING].imageData32
+                                    ? surfaces[(fy64 * csmW + fx64) * FACE_COUNT + FACE_CEILING]
+                                          .imageData32
                                     : null;
                             ceilCode = mapData[fy64 * mapSize + fx64] & 0xfff;
                         }
-                        lmCorr = lmData[((lmc * fyCeil) >> psh) * lmWidth + ((lmc * fxCeil) >> psh)];
+                        lmCorr =
+                            lmData[((lmc * fyCeil) >> psh) * lmWidth + ((lmc * fxCeil) >> psh)];
                         // Reads yOfs, the floor's shading level, not yOfsCeil.
                         // Faithful to the original; yOfsCeil is computed and unused.
                         yOfsCeilCorr = Math.max(0, yOfs - lmCorr);
                         if (ceilPixels !== null) {
-                            ofsSrc = (((fyCeil & psm) + yOfsCeilCorr * ps) * ps + (fxCeil & psm));
+                            ofsSrc = ((fyCeil & psm) + yOfsCeilCorr * ps) * ps + (fxCeil & psm);
                             aRenderSurf[ofsDstCeil] = ceilPixels[ofsSrc];
                         } else {
                             xOfs = ceilTiles[ceilCode];
                             if (xOfs >= 0) {
                                 ofsSrc =
-                                    (((fyCeil & psm) + yOfsCeilCorr * ps) * nFloorWidth +
-                                        ((fxCeil & psm) + xOfs * ps));
+                                    ((fyCeil & psm) + yOfsCeilCorr * ps) * nFloorWidth +
+                                    ((fxCeil & psm) + xOfs * ps);
                                 aRenderSurf[ofsDstCeil] = aFloorSurf[ofsSrc];
                             }
                         }
@@ -439,21 +443,23 @@ export function renderFlats(
                             cellY = fy64;
                             floorPixels =
                                 fx64 < csmW && fy64 < csmH
-                                    ? surfaces[(fy64 * csmW + fx64) * FACE_COUNT + FACE_FLOOR].imageData32
+                                    ? surfaces[(fy64 * csmW + fx64) * FACE_COUNT + FACE_FLOOR]
+                                          .imageData32
                                     : null;
                             code = mapData[fy64 * mapSize + fx64] & 0xfff;
                         }
-                        lmCorr = lmData[(((lmc * fy) / ps) | 0) * lmWidth + (((lmc * fx) / ps) | 0)];
+                        lmCorr =
+                            lmData[(((lmc * fy) / ps) | 0) * lmWidth + (((lmc * fx) / ps) | 0)];
                         yOfsCorr = Math.max(0, yOfs - lmCorr);
                         if (floorPixels !== null) {
-                            ofsSrc = ((((fy % ps) | 0) + yOfsCorr * ps) * ps + ((fx % ps) | 0));
+                            ofsSrc = (((fy % ps) | 0) + yOfsCorr * ps) * ps + ((fx % ps) | 0);
                             aRenderSurf[ofsDst] = floorPixels[ofsSrc];
                         } else {
                             xOfs = floorTiles[code];
                             if (xOfs >= 0) {
                                 ofsSrc =
-                                    ((((fy % ps) | 0) + yOfsCorr * ps) * nFloorWidth +
-                                        (((fx % ps) | 0) + xOfs * ps));
+                                    (((fy % ps) | 0) + yOfsCorr * ps) * nFloorWidth +
+                                    (((fx % ps) | 0) + xOfs * ps);
                                 aRenderSurf[ofsDst] = aFloorSurf[ofsSrc];
                             }
                         }
@@ -466,23 +472,29 @@ export function renderFlats(
                             ceilCellY = fy64;
                             ceilPixels =
                                 fx64 < csmW && fy64 < csmH
-                                    ? surfaces[(fy64 * csmW + fx64) * FACE_COUNT + FACE_CEILING].imageData32
+                                    ? surfaces[(fy64 * csmW + fx64) * FACE_COUNT + FACE_CEILING]
+                                          .imageData32
                                     : null;
                             ceilCode = mapData[fy64 * mapSize + fx64] & 0xfff;
                         }
-                        lmCorr = lmData[(((lmc * fyCeil) / ps) | 0) * lmWidth + (((lmc * fxCeil) / ps) | 0)];
+                        lmCorr =
+                            lmData[
+                                (((lmc * fyCeil) / ps) | 0) * lmWidth + (((lmc * fxCeil) / ps) | 0)
+                            ];
                         // Reads yOfs, the floor's shading level, not yOfsCeil.
                         // Faithful to the original; yOfsCeil is computed and unused.
                         yOfsCeilCorr = Math.max(0, yOfs - lmCorr);
                         if (ceilPixels !== null) {
-                            ofsSrc = ((((fyCeil % ps) | 0) + yOfsCeilCorr * ps) * ps + ((fxCeil % ps) | 0));
+                            ofsSrc =
+                                (((fyCeil % ps) | 0) + yOfsCeilCorr * ps) * ps +
+                                ((fxCeil % ps) | 0);
                             aRenderSurf[ofsDstCeil] = ceilPixels[ofsSrc];
                         } else {
                             xOfs = ceilTiles[ceilCode];
                             if (xOfs >= 0) {
                                 ofsSrc =
-                                    ((((fyCeil % ps) | 0) + yOfsCeilCorr * ps) * nFloorWidth +
-                                        (((fxCeil % ps) | 0) + xOfs * ps));
+                                    (((fyCeil % ps) | 0) + yOfsCeilCorr * ps) * nFloorWidth +
+                                    (((fxCeil % ps) | 0) + xOfs * ps);
                                 aRenderSurf[ofsDstCeil] = aFloorSurf[ofsSrc];
                             }
                         }

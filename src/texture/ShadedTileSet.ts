@@ -1,4 +1,11 @@
-import { cloneCanvas, context2d, createCanvas, isImage, applyFilter, type ImageSource } from '../core/canvas.js';
+import {
+    cloneCanvas,
+    context2d,
+    createCanvas,
+    isImage,
+    applyFilter,
+    type ImageSource,
+} from '../core/canvas.js';
 import { parse, rgba } from '../core/Rainbow.js';
 
 const DEFAULT_SHADING_LAYERS = 16;
@@ -122,8 +129,14 @@ export class ShadedTileSet {
      */
     drawTile(
         ctx: CanvasRenderingContext2D,
-        sx: number, sy: number, sw: number, sh: number,
-        dx: number, dy: number, dw: number, dh: number
+        sx: number,
+        sy: number,
+        sw: number,
+        sh: number,
+        dx: number,
+        dy: number,
+        dw: number,
+        dh: number
     ): void {
         const image = this._image;
         if (image === null) {
@@ -137,7 +150,11 @@ export class ShadedTileSet {
      *
      * @param target an existing canvas to draw into, instead of a new one
      */
-    extractTile(tile: number, level: number, target: HTMLCanvasElement | null = null): HTMLCanvasElement {
+    extractTile(
+        tile: number,
+        level: number,
+        target: HTMLCanvasElement | null = null
+    ): HTMLCanvasElement {
         const w = this._tileWidth;
         const h = this._tileHeight;
         const fragment = target ?? createCanvas(w, h);
@@ -167,7 +184,11 @@ export class ShadedTileSet {
      * Produces one shading layer: the original, optionally colour-filtered,
      * then fogged to `level`.
      */
-    private shadeImage(image: HTMLCanvasElement, level: number, filter: string | null): HTMLCanvasElement {
+    private shadeImage(
+        image: HTMLCanvasElement,
+        level: number,
+        filter: string | null
+    ): HTMLCanvasElement {
         const shaded = cloneCanvas(image);
         if (filter) {
             const f = parse(filter);
@@ -183,8 +204,7 @@ export class ShadedTileSet {
         const a = this._image;
         const b = this._originalImage;
         return (
-            (a === null ? 0 : a.width * a.height * 4) +
-            (b === null ? 0 : b.width * b.height * 4)
+            (a === null ? 0 : a.width * a.height * 4) + (b === null ? 0 : b.width * b.height * 4)
         );
     }
 }

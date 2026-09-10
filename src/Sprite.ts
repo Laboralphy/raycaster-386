@@ -1,5 +1,9 @@
 import { FX_NONE } from './consts.js';
-import { createTileAnimation, TileAnimation, type TileAnimationDef } from './texture/TileAnimation.js';
+import {
+    createTileAnimation,
+    TileAnimation,
+    type TileAnimationDef,
+} from './texture/TileAnimation.js';
 
 /**
  * One animation of a sprite, with a start index per facing.
@@ -58,8 +62,14 @@ export class Sprite {
      */
     readonly lastRendered: RenderedRect = {
         tileset: null,
-        sx: 0, sy: 0, sw: 0, sh: 0,
-        dx: 0, dy: 0, dw: 0, dh: 0
+        sx: 0,
+        sy: 0,
+        sw: 0,
+        sh: 0,
+        dx: 0,
+        dy: 0,
+        dw: 0,
+        dh: 0,
     };
 
     private _animations: Record<string, TileAnimation[]> = {};
@@ -152,7 +162,7 @@ export class Sprite {
         if (index < 0 || index >= group.length) {
             throw new RangeError(
                 `Sprite.setCurrentAnimation: facing ${index} is outside "${ref}", ` +
-                `which has ${group.length}`
+                    `which has ${group.length}`
             );
         }
         this._currentRef = ref;
@@ -180,7 +190,7 @@ export class Sprite {
         if (direction < 0 || direction >= group.length) {
             throw new RangeError(
                 `Sprite.setDirection: facing ${direction} is outside "${ref}", ` +
-                `which has ${group.length}. Map an angle onto Sprite.facings first.`
+                    `which has ${group.length}. Map an angle onto Sprite.facings first.`
             );
         }
         if (group.length > 1 && this._animation !== null) {

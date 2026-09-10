@@ -87,8 +87,10 @@ export class Actor<C = unknown> {
     hasMoved(): boolean {
         const p = this.position;
         return (
-            p.x !== this._lastX || p.y !== this._lastY ||
-            p.z !== this._lastZ || p.angle !== this._lastAngle
+            p.x !== this._lastX ||
+            p.y !== this._lastY ||
+            p.z !== this._lastZ ||
+            p.angle !== this._lastAngle
         );
     }
 

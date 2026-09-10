@@ -205,7 +205,7 @@ export function parse(color: string | RGBA): RGBA {
                 r: nibbles(nr, nr),
                 g: nibbles(ng, ng),
                 b: nibbles(nb, nb),
-                a: 255
+                a: 255,
             };
         }
 
@@ -221,7 +221,7 @@ export function parse(color: string | RGBA): RGBA {
                     r: parseInt(rgb[1], 10),
                     g: parseInt(rgb[2], 10),
                     b: parseInt(rgb[3], 10),
-                    a: 255
+                    a: 255,
                 };
             }
             const rgba = s.match(RE_RGBA);
@@ -230,7 +230,7 @@ export function parse(color: string | RGBA): RGBA {
                     r: parseInt(rgba[1], 10),
                     g: parseInt(rgba[2], 10),
                     b: parseInt(rgba[3], 10),
-                    a: (255 * parseFloat(rgba[4])) | 0
+                    a: (255 * parseFloat(rgba[4])) | 0,
                 };
             }
             throw new Error(`Rainbow.parse: invalid color structure "${color}"`);

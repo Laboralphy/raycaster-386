@@ -128,7 +128,11 @@ export function applyFilter(
 /**
  * Rescales a canvas into a new one.
  */
-export function resize(canvas: HTMLCanvasElement, width: number, height: number): HTMLCanvasElement {
+export function resize(
+    canvas: HTMLCanvasElement,
+    width: number,
+    height: number
+): HTMLCanvasElement {
     const out = createCanvas(width, height);
     setImageSmoothing(out, getImageSmoothing(canvas));
     context2d(out).drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, width, height);

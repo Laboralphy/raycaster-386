@@ -36,8 +36,12 @@ export { DebugDisplay } from './DebugDisplay.js';
 
 export { Renderer } from './Renderer.js';
 export type {
-    ScreenSettings, MetricsSettings, ShadingSettings,
-    CellMaterial, LightHandle, SharedResources
+    ScreenSettings,
+    MetricsSettings,
+    ShadingSettings,
+    CellMaterial,
+    LightHandle,
+    SharedResources,
 } from './Renderer.js';
 export { createScene } from './raycast/Scene.js';
 export type { Scene, Camera, Resume, AimedCell, SceneOptions } from './raycast/Scene.js';
@@ -59,8 +63,15 @@ export type { ActorId, ActorUpdate, ActorFrame } from './core/actorFrame.js';
 export { renderBackground } from './render/renderBackground.js';
 export { MapHelper } from './map/MapHelper.js';
 export type {
-    LevelMap, MapRow, MaterialDef, MaterialLight, FaceDef, FaceAnimation,
-    BuiltMaterial, BlockLight, BuildResult
+    LevelMap,
+    MapRow,
+    MaterialDef,
+    MaterialLight,
+    FaceDef,
+    FaceAnimation,
+    BuiltMaterial,
+    BlockLight,
+    BuildResult,
 } from './map/MapHelper.js';
 
 export { buildObjects } from './level/buildObjects.js';
@@ -69,7 +80,18 @@ export { loadLevel, decalOffset, RCE_VERSION } from './level/loadLevel.js';
 export type { LoadLevelOptions, LoadedLevel } from './level/loadLevel.js';
 export { LEVEL_CONSTANTS, resolveConstant, resolveConstants } from './level/constants.js';
 export type {
-    RceLevel, RceMetrics, RceTextures, RceShading, RceTileset,
-    RceLightSource, RceDecal, RceDecalFace, RceStartPoint, RceTag, DecalAlign,
-    RceBlueprint, RceObject, RceObjectLight
+    RceLevel,
+    RceMetrics,
+    RceTextures,
+    RceShading,
+    RceTileset,
+    RceLightSource,
+    RceDecal,
+    RceDecalFace,
+    RceStartPoint,
+    RceTag,
+    DecalAlign,
+    RceBlueprint,
+    RceObject,
+    RceObjectLight,
 } from './level/types.js';

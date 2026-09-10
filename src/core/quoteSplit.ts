@@ -18,5 +18,5 @@ export function quoteSplit(s: string): string[] {
     if (parts === null) {
         return [];
     }
-    return parts.map(part => part.replace(/^"/, '').replace(/"$/, ''));
+    return parts.map((part) => part.replace(/^"/, '').replace(/"$/, ''));
 }

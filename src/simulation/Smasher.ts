@@ -152,7 +152,10 @@ export class Smasher extends SectorRegistry<SmashingEntity> {
      * The factor is 0, so each force decays to nothing on the next
      * `reduceForces` — a collision push lasts exactly one tick.
      */
-    private computeSmashingForces(entity: SmashingEntity, hitters: readonly SmashingEntity[]): void {
+    private computeSmashingForces(
+        entity: SmashingEntity,
+        hitters: readonly SmashingEntity[]
+    ): void {
         const dummy = entity.dummy;
         const pos = dummy.position;
         for (const hitter of hitters) {

@@ -20,7 +20,9 @@ export interface FilledCell {
  * work on any region wider than a corridor.
  */
 export function floodFill(
-    x: number, y: number, test: (x: number, y: number) => boolean
+    x: number,
+    y: number,
+    test: (x: number, y: number) => boolean
 ): FilledCell[] {
     const seen = new MarkerRegistry();
     const out: FilledCell[] = [];

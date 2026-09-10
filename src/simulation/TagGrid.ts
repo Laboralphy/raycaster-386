@@ -129,8 +129,8 @@ export class TagGrid {
         }
         const before = this.cellAt(fromX, fromY);
         const after = this.cellAt(toX, toY);
-        const left = before === null ? [] : [...before].filter(id => after?.has(id) !== true);
-        const entered = after === null ? [] : [...after].filter(id => before?.has(id) !== true);
+        const left = before === null ? [] : [...before].filter((id) => after?.has(id) !== true);
+        const entered = after === null ? [] : [...after].filter((id) => before?.has(id) !== true);
         return { entered, left };
     }
 
@@ -146,7 +146,7 @@ export class TagGrid {
             height: this.height,
             nextId: this._nextId,
             tags: Object.fromEntries(this._idOf),
-            cells
+            cells,
         };
     }
 

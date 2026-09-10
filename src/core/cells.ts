@@ -61,7 +61,10 @@ export interface CellChange {
  * three writes come back as data.
  */
 export function alterBlock(
-    x: number, y: number, material: number, block: { phys?: number; offset?: number }
+    x: number,
+    y: number,
+    material: number,
+    block: { phys?: number; offset?: number }
 ): CellChange {
     return { x, y, material, phys: block.phys ?? 0, offset: block.offset ?? 0 };
 }

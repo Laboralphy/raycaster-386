@@ -48,7 +48,8 @@ export interface RceShading {
 }
 
 /** One face of a legend entry: a tile index, an animation, or nothing. */
-export type RceFace = number | readonly [start: number, length: number, duration: number, loop: ConstantRef] | null;
+export type RceFace =
+    number | readonly [start: number, length: number, duration: number, loop: ConstantRef] | null;
 
 /** One entry of the legend: a material, and the six faces it presents. */
 export interface RceMaterial {

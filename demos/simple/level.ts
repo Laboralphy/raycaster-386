@@ -24,7 +24,7 @@ export const LEVEL: LevelMap = {
         // still render.
         { code: VOID, phys: PHYS_NONE, faces: { f: 0, c: 1 } },
         { code: WALL, phys: PHYS_WALL, faces: { n: 0, e: 0, w: 0, s: 0 } },
-        { code: DOOR, phys: PHYS_DOOR_UP, faces: { n: 1, e: 1, w: 1, s: 1, f: 0, c: 1 } }
+        { code: DOOR, phys: PHYS_DOOR_UP, faces: { n: 1, e: 1, w: 1, s: 1, f: 0, c: 1 } },
     ],
     map: [
         '##########',
@@ -36,8 +36,8 @@ export const LEVEL: LevelMap = {
         '#   #    #',
         '#   #    #',
         '#   #    #',
-        '##########'
-    ]
+        '##########',
+    ],
 };
 
 export const METRICS = { spacing: 64, height: 96 };
@@ -46,7 +46,7 @@ export const SHADING = {
     shades: 16,
     color: '#000000',
     filter: null,
-    brightness: 0.1
+    brightness: 0.1,
 };
 
 /**
@@ -60,5 +60,5 @@ export const START = { x: 2.5, y: 6.5, angle: -Math.PI / 2 };
 
 export const TEXTURES = {
     walls: 'assets/walls.png',
-    flats: 'assets/flats.png'
+    flats: 'assets/flats.png',
 };

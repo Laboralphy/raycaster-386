@@ -1,6 +1,14 @@
 import {
-    PHYS_CURT_DOWN, PHYS_CURT_UP, PHYS_DOOR_DOUBLE, PHYS_DOOR_DOWN, PHYS_DOOR_LEFT,
-    PHYS_DOOR_RIGHT, PHYS_DOOR_UP, PHYS_FIRST_DOOR, PHYS_LAST_DOOR, PHYS_SECRET_BLOCK
+    PHYS_CURT_DOWN,
+    PHYS_CURT_UP,
+    PHYS_DOOR_DOUBLE,
+    PHYS_DOOR_DOWN,
+    PHYS_DOOR_LEFT,
+    PHYS_DOOR_RIGHT,
+    PHYS_DOOR_UP,
+    PHYS_FIRST_DOOR,
+    PHYS_LAST_DOOR,
+    PHYS_SECRET_BLOCK,
 } from '../consts.js';
 import type { ReadonlyCellMap } from '../core/CellMap.js';
 import { MarkerRegistry } from '../core/MarkerRegistry.js';
@@ -86,7 +94,7 @@ export class DoorPolicy {
         metrics,
         isCellOccupied = () => false,
         slidingDuration = DOOR_SLIDING_DURATION,
-        maintainDuration = DOOR_MAINTAIN_DURATION
+        maintainDuration = DOOR_MAINTAIN_DURATION,
     }: DoorPolicyOptions) {
         this._map = map;
         this._metrics = metrics;
@@ -240,7 +248,7 @@ export class DoorPolicy {
         const ordered = [...value.doors].sort(
             (a, b) => Number(b.child !== undefined) - Number(a.child !== undefined)
         );
-        this.doors.setState(ordered, entry =>
+        this.doors.setState(ordered, (entry) =>
             this.buildDoorContext(entry.x, entry.y, entry.autoclose ?? false)
         );
     }
@@ -292,7 +300,7 @@ export class DoorPolicy {
             slidingDuration: (this._slidingDuration * shape.slideFactor) | 0,
             maintainDuration: autoclose ? this._maintainDuration : Infinity,
             offsetMax: shape.offsetMax,
-            openFunction: 'smoothstep'
+            openFunction: 'smoothstep',
         });
         dc.data.x = x;
         dc.data.y = y;
@@ -320,7 +328,7 @@ export class DoorPolicy {
             maintainDuration: Infinity,
             offsetMax,
             openFunction: 'squareAccel',
-            closeFunction: 'squareDeccel'
+            closeFunction: 'squareDeccel',
         });
         dc1.data.x = x;
         dc1.data.y = y;
@@ -329,33 +337,41 @@ export class DoorPolicy {
         this.guard(dc1, x, y);
 
         let found = 0;
-        forEachNeighbor(this._map, x, y, (cx, cy, cphys) => {
-            if (cphys !== PHYS_SECRET_BLOCK) {
-                return;
-            }
-            if (++found > 1) {
-                throw new Error(`DoorPolicy: the secret block at (${x}, ${y}) has more than one secret neighbour`);
-            }
-            const dc2 = new DoorContext({
-                slidingDuration,
-                maintainDuration: Infinity,
-                offsetMax,
-                openFunction: 'squareDeccel',
-                closeFunction: 'squareAccel',
-                delayDuration: slidingDuration
-            });
-            dc2.data.x = cx;
-            dc2.data.y = cy;
-            dc2.data.phys = cphys;
-            dc2.data.secret = true;
-            dc2.events.on('check', (event: DoorCloseCheck) => {
-                // The pushed block must not close on anything standing in
-                // either cell: it would trap whoever is in the passage.
-                event.cancel = this._occupied(x, y) || this._occupied(cx, cy);
-            });
-            dc1.data.child = dc2;
-            this.doors.linkDoorContext(dc2);
-        }, CELL_NEIGHBOR_SIDE);
+        forEachNeighbor(
+            this._map,
+            x,
+            y,
+            (cx, cy, cphys) => {
+                if (cphys !== PHYS_SECRET_BLOCK) {
+                    return;
+                }
+                if (++found > 1) {
+                    throw new Error(
+                        `DoorPolicy: the secret block at (${x}, ${y}) has more than one secret neighbour`
+                    );
+                }
+                const dc2 = new DoorContext({
+                    slidingDuration,
+                    maintainDuration: Infinity,
+                    offsetMax,
+                    openFunction: 'squareDeccel',
+                    closeFunction: 'squareAccel',
+                    delayDuration: slidingDuration,
+                });
+                dc2.data.x = cx;
+                dc2.data.y = cy;
+                dc2.data.phys = cphys;
+                dc2.data.secret = true;
+                dc2.events.on('check', (event: DoorCloseCheck) => {
+                    // The pushed block must not close on anything standing in
+                    // either cell: it would trap whoever is in the passage.
+                    event.cancel = this._occupied(x, y) || this._occupied(cx, cy);
+                });
+                dc1.data.child = dc2;
+                this.doors.linkDoorContext(dc2);
+            },
+            CELL_NEIGHBOR_SIDE
+        );
 
         this.doors.linkDoorContext(dc1);
         return dc1;
@@ -376,12 +392,18 @@ export class DoorPolicy {
         }
         const { x, y } = dc.data;
         let sibling: DoorContext | null = null;
-        forEachNeighbor(this._map, x, y, (cx, cy) => {
-            const neighbor = this.doors.getDoorContext(cx, cy);
-            if (neighbor !== undefined && neighbor.data.secret === true) {
-                sibling = neighbor;
-            }
-        }, CELL_NEIGHBOR_SIDE);
+        forEachNeighbor(
+            this._map,
+            x,
+            y,
+            (cx, cy) => {
+                const neighbor = this.doors.getDoorContext(cx, cy);
+                if (neighbor !== undefined && neighbor.data.secret === true) {
+                    sibling = neighbor;
+                }
+            },
+            CELL_NEIGHBOR_SIDE
+        );
         return sibling;
     }
 }

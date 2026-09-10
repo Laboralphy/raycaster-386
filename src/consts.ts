@@ -21,8 +21,7 @@ export const DEFAULT_PHYS_CODE = PHYS_NONE;
 
 /** Every value a 4-bit phys code can legally hold. */
 export type PhysCode =
-    | 0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06
-    | 0x07 | 0x08 | 0x09 | 0x0a | 0x0b | 0x0c;
+    0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07 | 0x08 | 0x09 | 0x0a | 0x0b | 0x0c;
 
 /**
  * Surface (face) indices. 0..3 are walls in west/south/east/north order;
@@ -83,8 +82,7 @@ export const METRIC_LIGHTMAP_SCALE = 8;
 export const LIGHTMAP_TO_SURFACE_SHIFT = 1;
 
 /** Lightmap cells per map cell as stored on cell surfaces. Derived, = 4. */
-export const SURFACE_LIGHTMAP_SCALE =
-    METRIC_LIGHTMAP_SCALE >> LIGHTMAP_TO_SURFACE_SHIFT;
+export const SURFACE_LIGHTMAP_SCALE = METRIC_LIGHTMAP_SCALE >> LIGHTMAP_TO_SURFACE_SHIFT;
 
 /**
  * Wall z (`t * spacing`) and sprite z (the projected distance `f`) are on

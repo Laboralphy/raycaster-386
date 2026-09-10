@@ -40,7 +40,7 @@ export class MarkerRegistry {
      * Calls back for every marked position.
      */
     iterate(f: (x: number, y: number) => void): void {
-        this._s.forEach(n => {
+        this._s.forEach((n) => {
             f(n >> 16, n & 0xffff);
         });
     }
@@ -49,7 +49,7 @@ export class MarkerRegistry {
      * Merges another registry into this one. Mutates this registry.
      */
     merge(mr: MarkerRegistry): void {
-        mr._s.forEach(v => this._s.add(v));
+        mr._s.forEach((v) => this._s.add(v));
     }
 
     toArray(): { x: number; y: number }[] {

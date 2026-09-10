@@ -31,7 +31,10 @@ export const SPRITE_DIRECTION_COUNT = 8;
  * @returns the direction index now showing
  */
 export function faceCamera(
-    sprite: Sprite, facing: number, cameraX: number, cameraY: number
+    sprite: Sprite,
+    facing: number,
+    cameraX: number,
+    cameraY: number
 ): number {
     // Quantise onto the facings this sprite actually has. The original divided
     // the circle into a fixed eight and masked with `& 7`, which crashed on any
@@ -45,7 +48,7 @@ export function faceCamera(
     if (a < 0) {
         a = 2 * Math.PI + a;
     }
-    const direction = ((sectors * a) / (2 * Math.PI) | 0) % sectors;
+    const direction = (((sectors * a) / (2 * Math.PI)) | 0) % sectors;
     if (direction !== sprite.direction) {
         sprite.setDirection(direction);
     }

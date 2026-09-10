@@ -1,9 +1,10 @@
-import { MapHelper, Renderer, SpriteBinding, worldToCell } from '../../src/index.js';
-import type { ActorFrame, ReadonlyCellMap } from '../../src/index.js';
-import { Actor, ActorRegistry, DoorPolicy } from '../../src/simulation/index.js';
+import { MapHelper, Renderer, SpriteBinding, worldToCell } from '../../src';
+import type { ActorFrame, ReadonlyCellMap } from '../../src';
+import { Actor, ActorRegistry, DoorPolicy } from '../../src/simulation';
 import { LEVEL, METRICS, SHADING, START } from './level.js';
 import { SENTINEL_FACINGS, SENTINEL_TILE_HEIGHT, SENTINEL_TILE_WIDTH } from './spriteAtlas.js';
 import { PlayerThinker, SentinelThinker } from './thinkers.js';
+import { type Input } from './input';
 
 /** How close the player must be to a door to open it, in world units. */
 const REACH = 96;
@@ -24,19 +25,6 @@ export interface DemoContext {
     spacing: number;
     time: number;
     input: Input;
-}
-
-/** What the player is asking for this tick. */
-export interface Input {
-    forward: number;
-    strafe: number;
-    turn: number;
-    /** Set for one tick when the open-door key is pressed. */
-    use: boolean;
-}
-
-export function emptyInput(): Input {
-    return { forward: 0, strafe: 0, turn: 0, use: false };
 }
 
 /**
@@ -82,7 +70,7 @@ export class World {
             maintainDuration: DOOR_MAINTAIN,
             // A door must not close on anyone — the player included, since the
             // player is an actor and files into the same sectors.
-            isCellOccupied: (x, y) => this.actors.actorsAt(x, y).length > 0
+            isCellOccupied: (x, y) => this.actors.actorsAt(x, y).length > 0,
         });
 
         // The player is driven by a thinker like anything else, so the tick
@@ -92,7 +80,7 @@ export class World {
             y: START.y * METRICS.spacing,
             angle: START.angle,
             size: PLAYER_RADIUS,
-            ref: 'player'
+            ref: 'player',
         });
         this.player.thinker = new PlayerThinker();
     }
@@ -120,7 +108,7 @@ export class World {
             y: 3.5 * this._spacing,
             size: 10,
             ref: 'sentinel',
-            data: { direction: 1 }
+            data: { direction: 1 },
         });
         sentinel.thinker = new SentinelThinker();
         const tileset = rc.buildTileSet(sprites, SENTINEL_TILE_WIDTH, SENTINEL_TILE_HEIGHT);
@@ -130,13 +118,13 @@ export class World {
                 starts: Array.from({ length: SENTINEL_FACINGS }, (_, i) => i),
                 length: 1,
                 duration: 100,
-                loop: 0
+                loop: 0,
             },
             'idle'
         );
         sprite.setCurrentAnimation('idle');
         this.binding.bind(sentinel.id, sprite, {
-            light: rc.addLightSource(sentinel.position.x, sentinel.position.y, 24, 110, 0.6)
+            light: rc.addLightSource(sentinel.position.x, sentinel.position.y, 24, 110, 0.6),
         });
         this._sentinel = sentinel;
     }
@@ -156,7 +144,7 @@ export class World {
             map: this.renderer.cellMap,
             spacing: this._spacing,
             time: this._time,
-            input
+            input,
         };
     }
 

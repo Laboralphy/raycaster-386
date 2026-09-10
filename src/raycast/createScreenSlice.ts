@@ -8,7 +8,7 @@ import {
     PHYS_DOOR_LEFT,
     PHYS_DOOR_RIGHT,
     PHYS_DOOR_UP,
-    PHYS_INVISIBLE_BLOCK
+    PHYS_INVISIBLE_BLOCK,
 } from '../consts.js';
 import { offsetOf, physOf } from '../core/CellMap.js';
 import type { ShadedTileSet } from '../texture/ShadedTileSet.js';
@@ -71,7 +71,7 @@ export function createScreenSlice(
         1,
         ((dz << 1) + 2) | 0,
         z,
-        dim ? FX_DIM0 : 0
+        dim ? FX_DIM0 : 0,
     ];
 
     switch (phys) {

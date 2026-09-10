@@ -15,7 +15,7 @@ export function renderBackground(
     }
     const w = background.width;
     let h = background.height;
-    let x = offset % w | 0;
+    let x = (offset % w) | 0;
     while (x < 0) {
         x += w;
     }

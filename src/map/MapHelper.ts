@@ -6,7 +6,12 @@ import type { SurfaceTile } from '../raycast/context.js';
 /**
  * An animated face, as `[start, length, duration, loop]`.
  */
-export type FaceAnimation = readonly [start: number, length: number, duration: number, loop: number];
+export type FaceAnimation = readonly [
+    start: number,
+    length: number,
+    duration: number,
+    loop: number,
+];
 
 /** A face is either a fixed tile index or an animation. */
 export type FaceDef = number | FaceAnimation;
@@ -104,7 +109,7 @@ export class MapHelper {
                 start: a[0],
                 length: a[1],
                 duration: a[2],
-                loop: a[3] as 0 | 1 | 2
+                loop: a[3] as 0 | 1 | 2,
             });
             this._animations.set(key, anim);
         }
@@ -135,8 +140,8 @@ export class MapHelper {
                 w: this.buildFace(renderer, f.w),
                 e: this.buildFace(renderer, f.e),
                 f: this.buildFace(renderer, f.f),
-                c: this.buildFace(renderer, f.c)
-            }
+                c: this.buildFace(renderer, f.c),
+            },
         };
     }
 
@@ -148,7 +153,7 @@ export class MapHelper {
             offset: 0,
             ref: '',
             light: null,
-            faces: { n: null, e: null, w: null, s: null, f: null, c: null }
+            faces: { n: null, e: null, w: null, s: null, f: null, c: null },
         };
     }
 
@@ -181,7 +186,9 @@ export class MapHelper {
         });
 
         const resolveRow = (row: MapRow): number[] =>
-            (typeof row === 'string' ? row.split('') : row).map(cell => index.get(String(cell)) ?? 0);
+            (typeof row === 'string' ? row.split('') : row).map(
+                (cell) => index.get(String(cell)) ?? 0
+            );
 
         const grid = level.map.map(resolveRow);
         const ps = renderer.metrics.spacing;
@@ -205,7 +212,7 @@ export class MapHelper {
                             m.light.r0,
                             m.light.r1,
                             m.light.v
-                        )
+                        ),
                     });
                 }
             })
