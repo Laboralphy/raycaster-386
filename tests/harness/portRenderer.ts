@@ -7,7 +7,7 @@ import {
     mapSizeOf, storeyCells, SPRITE_TILE_HEIGHT, SPRITE_TILE_WIDTH,
     type CameraPose, type FaceAnimation, type FaceDef, type MaterialFaces, type SceneSpec
 } from './fixtures.js';
-import type { Frame } from './legacyRenderer.js';
+import type { Frame } from './compare.js';
 
 /**
  * Builds a ported Renderer from the same spec that drives the original, so

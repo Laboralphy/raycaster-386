@@ -172,7 +172,7 @@ All found by the golden-image harness, not by reading. All fixed in the port.
 Items 3 and 4 make the port's output legitimately differ from the original.
 Those three baselines (`room--crouched`, `storey--centre`,
 `storey--centre-diag`) are listed in `KNOWN_LEGACY_DIFFERENCES` in
-`tests/differential/renderer.golden.test.ts` with the reason. Every other
+`tests/golden/README.md` with the reason. Every other
 baseline is byte-identical.
 
 ---
@@ -260,7 +260,7 @@ total because the two engines are not doing the same work there (bug 4).
   about 7% of a whole frame. The loop is written out twice rather than
   branching per pixel: a branch there measured *worse* than the division it
   avoided, because it stops V8 keeping the values in registers across the loop
-  body. `tests/differential/port.golden.test.ts` pins the arithmetic
+  body. `tests/renderer/port.golden.test.ts` pins the arithmetic
   equivalence so the two copies cannot drift.
 - **Per-cell lookups hoisted out of the per-pixel loop.** Cell surfaces, the
   material code and the light level change every ~64 pixels, not every pixel.
@@ -454,7 +454,7 @@ _doorProcess() {
 ```
 
 That surface already exists on the port and is verified:
-`tests/differential/doorAnimation.test.ts` drives the `doors` fixture's
+`tests/renderer/doorAnimation.test.ts` drives the `doors` fixture's
 `PHYS_DOOR_UP` from shut to open a step at a time and checks each step renders
 differently, that the frame depends only on the current offset however it was
 reached, and that the offset round-trips the full 8-bit range without

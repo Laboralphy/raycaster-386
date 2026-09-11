@@ -2,7 +2,17 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
-import type { Frame } from './legacyRenderer.js';
+/**
+ * One rendered frame, as raw RGBA.
+ *
+ * Lived in the legacy renderer harness until that was removed on 2026-09-11;
+ * it is the comparison's own type, so it lives with the comparison.
+ */
+export interface Frame {
+    width: number;
+    height: number;
+    data: Uint8ClampedArray;
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 

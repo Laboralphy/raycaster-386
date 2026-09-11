@@ -3,7 +3,12 @@
 Everything the original engine does, sorted by which tier it belongs to, so that
 scope stays a decision that can be revisited rather than an assumption.
 
-Source of truth is `_OLD_PROJECT_/`, the imported copy of the original
+**Historical.** This inventory was written while the original was still
+vendored, and its references to `_OLD_PROJECT_/` and `tests/differential/`
+describe what was true during the migration. Both were retired on 2026-09-11;
+see PROGRESS.md. Nothing in the repo reads the legacy tree any more.
+
+Source of truth was `_OLD_PROJECT_/`, the imported copy of the original
 `o876-raycaster-engine`. Line numbers refer to it and were measured.
 
 **Totals.** `libs/engine/` is 3,668 lines, of which `Engine.js` alone is 1,529.

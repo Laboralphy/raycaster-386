@@ -9,46 +9,30 @@ Last updated 2026-09-11. The demo was moved onto thinkers, then split so input
 lives in its own class; a second demo was added on a real MapEdit level. The
 last phase in the plan was E.
 
-## Read this first: two things that do not travel
+## Read this first
 
-**1. `_OLD_PROJECT_/` is gitignored.** It is the imported copy of the original
-`o876-raycaster-engine` — the reference for every differential test, the source
-of the golden baselines. A fresh clone does not have it, and **7 test files
-lose their coverage** without it:
+**`_OLD_PROJECT_/` is no longer read by anything.** It is the imported copy of
+the original `o876-raycaster-engine` — and it is *tracked*, 1010 files and
+26 MB, so every clone has it. It was the reference for every differential test,
+the source of the golden baselines, and where the mansion levels lived. All
+three dependencies were retired on 2026-09-11; see "Retiring `_OLD_PROJECT_`"
+below. It is now a reading reference and nothing more: no script, test or build
+touches it, and `npm run check` passes with it deleted.
 
-```
-tests/differential/*.diff.test.ts            every bit-for-bit comparison (6 files)
-tests/differential/renderer.golden.test.ts   runs the original renderer
-```
+Whether it stays in the repo is an open question — see the next-steps list.
 
-That was 9 files until 2026-09-11. `tests/level/loadLevel.test.ts` and
-`buildObjects.test.ts` no longer need it: the four mansion levels they use are
-vendored at `tests/fixtures/mansion/` (2.4 MB, 4 levels and 103 textures), so
-both now run in full everywhere. They were the worst case for a silent skip —
-they reported as *passed files* while running a third to two-thirds of their
-tests, so they never appeared in the skipped count at all.
+The one optional fixture left is `demos/dark-village/assets/levels/level-1.json`,
+the MapEdit save behind that demo's level. Without it `tests/mapedit/fidelity.test.ts`
+skips, and `tests/harness/announce.ts` prints a banner saying so. Set
+`RAYCASTER_REQUIRE_FIXTURES=1` to make that a hard failure instead.
 
-They skip rather than fail, so the suite still goes green. **`tests/harness/announce.ts`
-now prints a banner when the tree is missing**, naming every gated file and
-saying what the run no longer proves — a skipped suite is otherwise just a
-number in the summary, indistinguishable from a full run. Set
-`RAYCASTER_REQUIRE_FIXTURES=1` to turn that banner into a hard failure, for a
-checkout that is meant to be complete.
-
-To restore it, copy the original engine's `libs/`, `apps/` and `games/` into
-`_OLD_PROJECT_/`, or point `LEGACY_ENGINE=/path/to/checkout` at a copy
-elsewhere. `tests/harness/legacy.ts` resolves it.
-
-`scripts/convert-mapedit-level.mjs` **no longer needs it**: the converter is
-`src/mapedit`, this project's own TypeScript port of `libs/generate`.
-
-**2. Check whether phase F is committed.** If `git status` shows
+**Check whether phase F is committed.** If `git status` shows
 `src/level/buildObjects.ts` and `src/render/spriteFacing.ts` as untracked, the
 work described under "Rendering" below is local only.
 
 ## State
 
-272 tests, 28 files. `npm run check` is typecheck (three configs) + tests +
+256 tests, 25 files. `npm run check` is typecheck (three configs) + tests +
 build. Bundles: `dist/index.js` (rendering, ~111 kB), `dist/simulation.js`
 (~35 kB), `dist/schema.js` (the RCE-100 schema, ~22 kB).
 
@@ -232,13 +216,16 @@ geometry, flood fill.
 
 ### What is worth doing next, in rough order
 
-1. **The legacy tree decision** (see the top of this file). The suite skips ten
-   files silently without `_OLD_PROJECT_`; a ~2.9 MB subset would make a fresh
-   clone fully testable. Either vendor it or add an import script, and make the
-   skip loud regardless.
-2. **`DoorPolicy` has no differential test** — the largest ported surface with
-   only unit coverage, because its original cannot be isolated from `Engine.js`.
-3. **Package it**: the version is still 0.1.0 and nothing has been published.
+1. **`DoorPolicy` has only unit coverage** — the largest ported surface never
+   got a differential test, because its original could not be isolated from
+   `Engine.js`, and that option has now expired with the legacy tree. Golden
+   coverage of doors mid-slide exists (`doors--*`, `doorAnimation.test.ts`);
+   what is missing is the policy's decision logic under load.
+2. **Package it**: the version is still 0.1.0 and nothing has been published.
+3. **Decide whether `_OLD_PROJECT_` stays in the repo.** It is tracked — 1010
+   files, 26 MB on disk — and nothing reads it any more. Removing it is an
+   ordinary commit, recoverable from history; the argument for keeping it is
+   that it is the only copy of the engine this port replaces.
 
 Done since this list was written: a second demo (`dark-village`), the vitest
 upgrade (now 5.0.0), and the four steps that retire the legacy tree — see
@@ -260,14 +247,22 @@ Three of the four steps are done:
    into a corner — all gaps that let the sprite-culling bug survive 276 tests.
 3. **Vendor the level fixtures and rewrite the bench** — done. See above and
    `tests/bench/baseline.json`.
-4. **Delete** the six `*.diff.test.ts`, `renderer.golden.test.ts`,
-   `tests/harness/legacy.ts`, `legacyRenderer.ts`, the `hasLegacy` gate, the
-   first banner in `announce.ts`, and `_OLD_PROJECT_` itself. Not done, and the
-   only step left. Nothing depends on it being done soon.
+4. **Delete the differential suite** — done. The six `*.diff.test.ts`,
+   `renderer.golden.test.ts`, `tests/harness/legacy.ts`, `legacyRenderer.ts`,
+   the `hasLegacy` gate and its banner are gone: 7 files, 38 tests. The three
+   tests that never needed the original moved to `tests/renderer/`, which is
+   what `tests/differential/` had been reduced to.
 
-What is lost at step 4 is the ability to ask the original what the correct
-output is. The 45 baselines are the frozen answer, and `port.golden.test.ts` —
-which never needed the tree — is what enforces them from then on.
+What is lost is the ability to ask the original what the correct output is. The
+45 baselines in `tests/golden/` are the frozen answer; `port.golden.test.ts` —
+which never needed the tree — enforces them from here. **`tests/golden/README.md`
+records where they came from, and why 7 of them deliberately differ from what
+the original produced**, because a baseline nobody can explain is a baseline
+nobody dares change.
+
+`UPDATE_GOLDEN=1` now re-records from the port, not the original, so a bug
+introduced and then blessed becomes the new truth. Read `.golden-out/` before
+re-recording.
 
 ## Known open items
 
@@ -280,12 +275,14 @@ which never needed the tree — is what enforces them from then on.
   far came from tests, and three of the last four from *differential* tests.
 - **Pre-existing lint debt**: 20 `curly` errors, all `--fix`-able, now entirely
   in older test files — `tests/harness/compare.ts`, `tests/simulation/doors*`,
-  `tests/differential/*`, `tests/demos/simple/world.test.ts`. None in `src/`,
-  and none left in `demos/` since the prettier pass.
-- **`dark-village` keeps no level sources.** Its RCE-100 and atlases are
-  committed and the demo runs from a fresh clone, but the MapEdit save and
-  tiles it was generated from were deleted, and `scripts/convert-mapedit-level.mjs`
-  needs `_OLD_PROJECT_` anyway. Editing the level means re-importing both.
+  `tests/demos/simple/world.test.ts`. None in `src/`, and none left in `demos/`
+  since the prettier pass. Down from 20: four went with the retired suite.
+- **`dark-village` keeps its MapEdit save but not its tiles.**
+  `assets/levels/level-1.json` is back — it is the fidelity fixture for
+  `src/mapedit` — but the 2.1 MB of unmerged source tiles it was built from are
+  not. So the level can be *converted* (the converter is `src/mapedit` and needs
+  nothing external) but not *re-atlased*: editing it means re-importing the
+  tiles.
 - **The README's benchmark table is stale** — it lists 7 scenes and +3.1%;
   `npm run bench` now runs 10, including `animated-flats` where the original
   mis-samples and the port is ~47% faster. The port is faster overall either
@@ -319,9 +316,8 @@ npm run bench        # the renderer against tests/bench/baseline.json
 UPDATE_BENCH=1 npm run bench    # re-record that baseline
 npm run demo         # every demo on http://localhost:8080, one route each
 npm run demo -- --watch     # ...rebuilding both on change
-UPDATE_GOLDEN=1 npm test    # recapture the 34 baselines from the original
+UPDATE_GOLDEN=1 npm test    # re-record the 45 baselines FROM THE PORT — read the diffs first
 
-# Converts a MapEdit save to RCE-100; needs _OLD_PROJECT_ and the level sources,
-# neither of which is in the repo. Kept for the next level, not for this one.
+# Converts a MapEdit save to RCE-100. Needs only the save and its tiles.
 node scripts/convert-mapedit-level.mjs <demo-dir>
 ```

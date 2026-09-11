@@ -8,7 +8,7 @@ import { buildSentinelAtlas } from '../../../demos/simple/spriteAtlas.js';
 import { PHYS_NONE } from '../../../src/index.js';
 import { installDom } from '../../harness/dom.js';
 import { compareFrames, isClean } from '../../harness/compare.js';
-import type { Frame } from '../../harness/legacyRenderer.js';
+import type { Frame } from '../../harness/compare.js';
 
 /** Decodes one of the demo's real PNG assets into a canvas. */
 async function asset(name: string): Promise<HTMLCanvasElement> {

@@ -168,13 +168,16 @@ one indexed load beats two dependent ones.
 npm test
 ```
 
-`tests/differential/` diffs ported modules against the original JS. The harness
-bundles a module out of a sibling `o876-raycaster-engine` checkout and imports
-it, so behaviour can be compared directly:
+Everything runs on a fresh clone — no external checkout, no optional
+dependency. That was not always true: until 2026-09-11 a `tests/differential/`
+suite bundled modules out of the original `o876-raycaster-engine` and compared
+them bit for bit, and skipped silently when that tree was absent. The migration
+it existed for is finished, so it was retired.
 
-```bash
-LEGACY_ENGINE=/path/to/o876-raycaster-engine npm test
-```
+What it leaves behind is `tests/golden/` — 45 baseline images captured from the
+original while it was still there, enforced by `tests/renderer/port.golden.test.ts`.
+`tests/golden/README.md` explains where each came from and why seven of them
+deliberately differ from the original's output.
 
 These tests skip when that checkout is absent. `TileAnimation` and `Rainbow`
 are currently pinned this way — including all 148 colour-table entries, which
@@ -243,9 +246,9 @@ Three, all found by the harness rather than by reading:
   nothing and the shading transmit in `optionsReaction` was commented out, so
   the original's upper floor shaded with the default 16 layers while sharing a
   tileset the ground floor had built with 8 — indexing past the end of the
-  atlas. This is why `storey--centre` and `storey--centre-diag` are the two
-  baselines that deliberately differ; `tests/differential/renderer.golden.test.ts`
-  lists them in `KNOWN_LEGACY_DIFFERENCES` with the reason.
+  atlas. This is why `storey--centre` and `storey--centre-diag` are two of the
+  baselines that deliberately differ; `tests/golden/README.md` lists all seven
+  with their reasons.
 
 Two more surfaced later:
 
