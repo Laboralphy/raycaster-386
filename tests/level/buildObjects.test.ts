@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
@@ -6,10 +6,8 @@ import { buildObjects, decalOffset, loadLevel } from '../../src/index.js';
 import type { RceBlueprint, RceLevel } from '../../src/index.js';
 import { Renderer } from '../../src/Renderer.js';
 import { installDom } from '../harness/dom.js';
-import { LEGACY_ROOT } from '../harness/legacy.js';
 
-const MANSION = resolve(LEGACY_ROOT, 'games/mansion');
-const hasMansion = existsSync(resolve(MANSION, 'assets/levels/mans-cabin.json'));
+const MANSION = resolve(__dirname, '../fixtures/mansion');
 
 async function mansionImage(src: string): Promise<HTMLCanvasElement> {
     const image = await loadImage(readFileSync(resolve(MANSION, src)));
@@ -41,7 +39,7 @@ describe('decal alignment', () => {
     });
 });
 
-describe.skipIf(!hasMansion)('buildObjects', () => {
+describe('buildObjects', () => {
     it('places every object in a real level, with its lights', async () => {
         installDom();
         const data = level('mans-cabin');
@@ -105,7 +103,7 @@ describe.skipIf(!hasMansion)('buildObjects', () => {
     }, 120_000);
 });
 
-describe.skipIf(!hasMansion)('blueprints supplied from outside the level', () => {
+describe('blueprints supplied from outside the level', () => {
     it('merges them with whatever the level declares', async () => {
         installDom();
         const data = level('mans-cabin');

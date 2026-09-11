@@ -13,20 +13,20 @@ last phase in the plan was E.
 
 **1. `_OLD_PROJECT_/` is gitignored.** It is the imported copy of the original
 `o876-raycaster-engine` — the reference for every differential test, the source
-of the golden baselines, and where the mansion levels live. A fresh clone does
-not have it, and **9 test files lose some or all of their coverage** without it:
+of the golden baselines. A fresh clone does not have it, and **7 test files
+lose their coverage** without it:
 
 ```
-tests/differential/*.diff.test.ts     every bit-for-bit comparison (6 files)
-tests/differential/renderer.golden.test.ts   all 15 skip
-tests/level/loadLevel.test.ts         9 of 14 skip; the file still reports "passed"
-tests/level/buildObjects.test.ts      6 of 15 skip; likewise
-tests/bench/renderer.bench.ts         not part of `npm test`
+tests/differential/*.diff.test.ts            every bit-for-bit comparison (6 files)
+tests/differential/renderer.golden.test.ts   runs the original renderer
 ```
 
-The last two are the reason the banner exists: they report as *passed files*
-while running a third to two-thirds of their tests, so they never appear in the
-skipped count at all.
+That was 9 files until 2026-09-11. `tests/level/loadLevel.test.ts` and
+`buildObjects.test.ts` no longer need it: the four mansion levels they use are
+vendored at `tests/fixtures/mansion/` (2.4 MB, 4 levels and 103 textures), so
+both now run in full everywhere. They were the worst case for a silent skip —
+they reported as *passed files* while running a third to two-thirds of their
+tests, so they never appeared in the skipped count at all.
 
 They skip rather than fail, so the suite still goes green. **`tests/harness/announce.ts`
 now prints a banner when the tree is missing**, naming every gated file and
@@ -238,15 +238,36 @@ geometry, flood fill.
    skip loud regardless.
 2. **`DoorPolicy` has no differential test** — the largest ported surface with
    only unit coverage, because its original cannot be isolated from `Engine.js`.
-3. **Port `libs/generate` to TypeScript.** `scripts/convert-mapedit-level.mjs`
-   shells out to the original, so converting a level needs `_OLD_PROJECT_`.
-   [MAPEDIT_ANALYSIS.md](MAPEDIT_ANALYSIS.md) already lists this as the piece
-   worth keeping, and the mansion levels are known-good fixtures to test it
-   against. Folds into item 1.
-4. **Package it**: the version is still 0.1.0 and nothing has been published.
+3. **Package it**: the version is still 0.1.0 and nothing has been published.
 
-Done since this list was written: a second demo (`dark-village`, above) and the
-vitest upgrade (now 5.0.0).
+Done since this list was written: a second demo (`dark-village`), the vitest
+upgrade (now 5.0.0), and the four steps that retire the legacy tree — see
+below.
+
+### Retiring `_OLD_PROJECT_`
+
+Decided 2026-09-11: the original is obsolete and the port evolves on its own.
+Differential testing is a *migration* technique, and the migration is over.
+Three of the four steps are done:
+
+1. **Port `libs/generate`** — done. `src/mapedit`, its own entry point, with a
+   fidelity test proving it reproduces the original converter field for field
+   on a real level. This was the irreversible one: nothing else can compile a
+   MapEdit save, and no other save exists anywhere.
+2. **Widen the golden baselines** — done. 34 to 45, the new poses captured from
+   the original *while it could still answer*. They cover wound camera angles,
+   the sprite cull's accept side, boundary and reject side, and a camera wedged
+   into a corner — all gaps that let the sprite-culling bug survive 276 tests.
+3. **Vendor the level fixtures and rewrite the bench** — done. See above and
+   `tests/bench/baseline.json`.
+4. **Delete** the six `*.diff.test.ts`, `renderer.golden.test.ts`,
+   `tests/harness/legacy.ts`, `legacyRenderer.ts`, the `hasLegacy` gate, the
+   first banner in `announce.ts`, and `_OLD_PROJECT_` itself. Not done, and the
+   only step left. Nothing depends on it being done soon.
+
+What is lost at step 4 is the ability to ask the original what the correct
+output is. The 45 baselines are the frozen answer, and `port.golden.test.ts` —
+which never needed the tree — is what enforces them from then on.
 
 ## Known open items
 
@@ -294,7 +315,8 @@ continue into D and E.
 npm run check        # typecheck + test + build — the one to run before committing
 npm test             # tests only
 npm run typecheck    # three configs: src, src/simulation (no DOM), tests
-npm run bench        # port vs original; needs _OLD_PROJECT_
+npm run bench        # the renderer against tests/bench/baseline.json
+UPDATE_BENCH=1 npm run bench    # re-record that baseline
 npm run demo         # every demo on http://localhost:8080, one route each
 npm run demo -- --watch     # ...rebuilding both on change
 UPDATE_GOLDEN=1 npm test    # recapture the 34 baselines from the original

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
@@ -6,11 +6,17 @@ import { loadLevel, resolveConstant, resolveConstants } from '../../src/index.js
 import type { RceLevel } from '../../src/index.js';
 import { Renderer } from '../../src/Renderer.js';
 import { installDom } from '../harness/dom.js';
-import { LEGACY_ROOT } from '../harness/legacy.js';
 
-const MANSION = resolve(LEGACY_ROOT, 'games/mansion');
+/**
+ * Real levels, vendored into the repo rather than read out of the legacy tree.
+ *
+ * These are RCE-100 build artifacts whose MapEdit sources no longer exist
+ * anywhere, so they are input fixtures only — see the README beside them.
+ * Vendoring is what lets this file run in full on a fresh clone; it used to
+ * skip most of itself while still reporting as a passed file.
+ */
+const MANSION = resolve(__dirname, '../fixtures/mansion');
 const LEVELS = ['mans-test-ai', 'mans-cabin', 'mans-level-1', 'mans-test1'];
-const hasMansion = existsSync(resolve(MANSION, 'assets/levels/mans-cabin.json'));
 
 /** Loads a texture from the mansion game's asset tree. */
 async function mansionImage(src: string): Promise<HTMLCanvasElement> {
@@ -63,7 +69,7 @@ describe('level constants', () => {
     });
 });
 
-describe.skipIf(!hasMansion)('loadLevel against the shipped mansion levels', () => {
+describe('loadLevel against the shipped mansion levels', () => {
     it.each(LEVELS)('loads %s with its real textures', async name => {
         installDom();
         const data = level(name);
@@ -119,7 +125,7 @@ describe.skipIf(!hasMansion)('loadLevel against the shipped mansion levels', () 
     }, 60_000);
 });
 
-describe.skipIf(!hasMansion)('the validate hook', () => {
+describe('the validate hook', () => {
     it('runs before the renderer is touched, on the level as written', async () => {
         installDom();
         const data = level('mans-test-ai');
