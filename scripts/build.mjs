@@ -11,7 +11,8 @@ const common = {
     entryPoints: {
         index: 'src/index.ts',
         simulation: 'src/simulation/index.ts',
-        schema: 'src/level/schema.ts'
+        schema: 'src/level/schema.ts',
+        mapedit: 'src/mapedit/index.ts'
     },
     bundle: true,
     format: 'esm',

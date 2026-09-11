@@ -37,6 +37,16 @@ const room: SceneSpec = {
         { name: 'centre-diag', x: 4 * 64, y: 4 * 64, angle: Math.PI / 4, height: 1 },
         { name: 'corner', x: 1.5 * 64, y: 1.5 * 64, angle: Math.PI / 3, height: 1 },
         { name: 'off-grid', x: 3.37 * 64, y: 5.11 * 64, angle: 1.234, height: 1 },
+        // A camera angle is accumulated and never wrapped, so a player who
+        // keeps turning arrives here. Geometry is cast with periodic cos/sin
+        // and must be unmoved by the winding; anything that compares an angle
+        // against a range instead is not, which is how the sprite cull broke.
+        { name: 'wound-diag', x: 4 * 64, y: 4 * 64, angle: Math.PI / 4 + 4 * Math.PI, height: 1 },
+        { name: 'wound-negative', x: 4 * 64, y: 4 * 64, angle: -6 * Math.PI, height: 1 },
+        // Wedged into a corner, close to two walls at once, but angled so the
+        // room is still in shot — a baseline of flat wall proves nothing, and
+        // the harness rejects one.
+        { name: 'against-wall', x: 1.12 * 64, y: 1.12 * 64, angle: Math.PI / 4, height: 1 },
         // height !== 1 takes the general flat path rather than the fvh === 1
         // fast path, so both branches of renderFlats are covered.
         { name: 'crouched', x: 4 * 64, y: 4 * 64, angle: 0, height: 0.5 },
@@ -87,7 +97,8 @@ const doors: SceneSpec = {
         { name: 'facing-door-up', x: 4 * 64, y: 3.5 * 64, angle: Math.PI, height: 1 },
         { name: 'facing-transparent', x: 3.5 * 64, y: 4 * 64, angle: -Math.PI / 2, height: 1 },
         { name: 'facing-door-left', x: 4 * 64, y: 3.5 * 64, angle: 0, height: 1 },
-        { name: 'oblique', x: 2.2 * 64, y: 5.7 * 64, angle: 0.9, height: 1 }
+        { name: 'oblique', x: 2.2 * 64, y: 5.7 * 64, angle: 0.9, height: 1 },
+        { name: 'wound-facing-door', x: 4 * 64, y: 3.5 * 64, angle: Math.PI + 4 * Math.PI, height: 1 }
     ]
 };
 
@@ -125,7 +136,8 @@ const lit: SceneSpec = {
     ],
     cameras: [
         { name: 'between-lights', x: 4 * 64, y: 4 * 64, angle: Math.PI / 4, height: 1 },
-        { name: 'near-light', x: 2.5 * 64, y: 2.5 * 64, angle: 0, height: 1 }
+        { name: 'near-light', x: 2.5 * 64, y: 2.5 * 64, angle: 0, height: 1 },
+        { name: 'wound', x: 4 * 64, y: 4 * 64, angle: Math.PI / 4 - 4 * Math.PI, height: 1 }
     ]
 };
 
@@ -205,7 +217,31 @@ const sprites: SceneSpec = {
     cameras: [
         { name: 'facing-sprites', x: 2 * 64, y: 4 * 64, angle: 0, height: 1 },
         { name: 'close-up', x: 4.2 * 64, y: 4 * 64, angle: 0, height: 1 },
-        { name: 'raised-view', x: 2 * 64, y: 4 * 64, angle: 0, height: 1.4 }
+        { name: 'raised-view', x: 2 * 64, y: 4 * 64, angle: 0, height: 1.4 },
+        // Every pose above looks due east from a fresh angle, which is exactly
+        // the range where the original's single-correction bearing reduction
+        // still worked. These wind the camera past it. The original loses its
+        // sprites here and the port does not, so both are listed in
+        // KNOWN_LEGACY_DIFFERENCES.
+        { name: 'wound-two-turns', x: 2 * 64, y: 4 * 64, angle: 4 * Math.PI, height: 1 },
+        { name: 'wound-negative', x: 2 * 64, y: 4 * 64, angle: -6 * Math.PI, height: 1 },
+        // Off-axis but in view: the cull's accept side.
+        { name: 'oblique', x: 3.1 * 64, y: 5.6 * 64, angle: -0.6, height: 1 },
+        // At the edge of the accepted cone, where the cull decides.
+        { name: 'fov-edge', x: 4.2 * 64, y: 4 * 64, angle: 0.52, height: 1 },
+        // Facing away: everything must be culled, and stay culled when wound.
+        //
+        // These two baselines are *not* byte-identical, unlike the pair above,
+        // and that is the point of keeping both. The sprites are correctly
+        // culled in each; the 120 differing pixels are one column — x = 80,
+        // the centre ray — where cos(PI) is exactly -1 but cos(5*PI) carries a
+        // rounding error, moving one wall intersection by a fraction of a
+        // texel. The original does the same and agrees with the port on both,
+        // so it is a property of floating point at an exactly axis-aligned
+        // angle, not a defect. It also bounds the winding invariance claim:
+        // sprite culling is exact under winding, geometry is not.
+        { name: 'turned-away', x: 2 * 64, y: 4 * 64, angle: Math.PI, height: 1 },
+        { name: 'turned-away-wound', x: 2 * 64, y: 4 * 64, angle: Math.PI + 4 * Math.PI, height: 1 }
     ]
 };
 

@@ -8,16 +8,11 @@
  * animation frames concatenated, phys and loop codes resolved to `@PHYS_*`
  * strings. See documentation/MAPEDIT_ANALYSIS.md.
  *
- * The conversion itself is the original engine's `libs/generate`, used
- * unmodified so the output is known-good. That lives in `_OLD_PROJECT_`, which
- * is gitignored, so **this script only runs where the legacy tree is present**
- * — which is why its output is committed rather than generated at build time.
+ * The conversion itself is `src/mapedit`, this project's own TypeScript port
+ * of the original engine's `libs/generate`. **It no longer needs
+ * `_OLD_PROJECT_`.**
  *
- * Note that `demos/dark-village` no longer carries its sources: only the
- * conversion's output is committed, so that demo cannot be re-converted
- * without re-importing the MapEdit save and its tiles.
- *
- * `generate` performs no image work itself: it asks an appender to combine
+ * `convertMapEditLevel` performs no image work: it asks an appender to combine
  * tiles, and this supplies one over @napi-rs/canvas. The browser editor's own
  * appender (`apps/mapedit/src/libs/append-images`) lays frames out left to
  * right and reports the *frame* size rather than the sheet size; this matches
@@ -25,13 +20,10 @@
  * level JSON stays small.
  */
 import { createHash } from 'node:crypto';
-import { createRequire } from 'node:module';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
-
-const LEGACY = resolve('_OLD_PROJECT_/libs/generate/index.js');
+import * as esbuild from 'esbuild';
 
 const demoDir = process.argv[2];
 if (!demoDir) {
@@ -45,27 +37,26 @@ const outDir = join(assets, 'textures');
 const outFile = join(assets, basename(source).replace(/\.json$/, '.rce.json'));
 
 /**
- * Loads `generate` as CommonJS.
+ * Loads the converter, compiling the TypeScript on the fly.
  *
- * It predates this package's `"type": "module"`, so Node reads its `.js` as
- * ESM and chokes on `module.exports`. Copying it to a `.cjs` outside the tree
- * is the least invasive fix: the legacy checkout is a read-only reference.
+ * A script rather than part of the build: this runs when a level changes,
+ * which is far less often than `npm run build`, and bundling on demand keeps
+ * the converter out of the published artifacts' dependency graph.
  */
-function loadGenerate() {
-    let src;
-    try {
-        src = readFileSync(LEGACY, 'utf8');
-    } catch {
-        console.error(
-            `no legacy converter at ${LEGACY}\n` +
-            'This script needs _OLD_PROJECT_, which is gitignored. Its output is ' +
-            'committed, so you only need this to re-convert a changed level.'
-        );
-        process.exit(1);
-    }
-    const shim = join(tmpdir(), `rc386-generate-${process.pid}.cjs`);
-    writeFileSync(shim, src);
-    return createRequire(import.meta.url)(shim);
+async function loadConverter() {
+    // Built into node_modules, never into the demo's assets.
+    const cache = resolve('node_modules/.cache/raycaster-386');
+    const out = join(cache, 'mapedit.mjs');
+    mkdirSync(cache, { recursive: true });
+    await esbuild.build({
+        entryPoints: [resolve('src/mapedit/index.ts')],
+        bundle: true,
+        format: 'esm',
+        platform: 'node',
+        outfile: out,
+        logLevel: 'silent'
+    });
+    return import(`${out}?t=${Date.now()}`);
 }
 
 mkdirSync(outDir, { recursive: true });
@@ -113,10 +104,10 @@ async function appendImages(tilesets, start, count) {
     return result;
 }
 
-const generate = loadGenerate();
+const { convertMapEditLevel } = await loadConverter();
 const input = JSON.parse(readFileSync(source, 'utf8'));
 
-const data = await generate(input, appendImages);
+const data = await convertMapEditLevel(input, appendImages);
 
 // The sky is passed through by name rather than combined, so it is copied
 // beside the atlases and repointed.

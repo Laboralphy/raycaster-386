@@ -18,6 +18,10 @@
     "./schema": {
       "types": "./dist/schema.d.ts",
       "import": "./dist/schema.js"
+    },
+    "./mapedit": {
+      "types": "./dist/mapedit.d.ts",
+      "import": "./dist/mapedit.js"
     }
   },
   "files": [

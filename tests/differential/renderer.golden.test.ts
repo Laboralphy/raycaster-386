@@ -29,6 +29,14 @@ const KNOWN_LEGACY_DIFFERENCES: Record<string, string> = {
         'collapses to 0 — it samples column 0 of the atlas for every pixel. The port ' +
         'resolves the animation to a frame',
     'animated-flats--frame-2': 'same as animated-flats--frame-0',
+    'sprites--wound-two-turns':
+        'a camera angle is accumulated and never wrapped, and the original reduced a ' +
+        "sprite's bearing into (-PI, PI] by adding or subtracting 2*PI exactly once — " +
+        'which cannot close a gap several revolutions wide. Past ~1.38 net turns its ' +
+        'sprites fail the off-axis test and vanish, while the walls, cast with periodic ' +
+        'cos/sin, render normally. The port reduces with a modulo. Found by playing ' +
+        'demos/dark-village on 2026-09-11; see tests/spriteCulling.test.ts',
+    'sprites--wound-negative': 'same as sprites--wound-two-turns, winding the other way',
     'room--crouched':
         'one pixel: the original computes a flat source row as ' +
         '((fy % ps) + layer * ps) | 0, and where fy %% ps lands just under the cell size ' +

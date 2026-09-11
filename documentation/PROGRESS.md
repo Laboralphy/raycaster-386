@@ -14,24 +14,33 @@ last phase in the plan was E.
 **1. `_OLD_PROJECT_/` is gitignored.** It is the imported copy of the original
 `o876-raycaster-engine` — the reference for every differential test, the source
 of the golden baselines, and where the mansion levels live. A fresh clone does
-not have it, and **10 of 23 test files silently skip** without it:
+not have it, and **9 test files lose some or all of their coverage** without it:
 
 ```
-tests/differential/*.diff.test.ts     every bit-for-bit comparison
-tests/differential/renderer.golden.test.ts
-tests/level/loadLevel.test.ts         the real mansion levels
-tests/level/buildObjects.test.ts
-tests/bench/renderer.bench.ts
+tests/differential/*.diff.test.ts     every bit-for-bit comparison (6 files)
+tests/differential/renderer.golden.test.ts   all 15 skip
+tests/level/loadLevel.test.ts         9 of 14 skip; the file still reports "passed"
+tests/level/buildObjects.test.ts      6 of 15 skip; likewise
+tests/bench/renderer.bench.ts         not part of `npm test`
 ```
 
-They skip rather than fail, so the suite still goes green — with roughly half
-the coverage. To restore it, copy the original engine's `libs/`, `apps/` and
-`games/` into `_OLD_PROJECT_/`, or point `LEGACY_ENGINE=/path/to/checkout` at a
-copy elsewhere. `tests/harness/legacy.ts` resolves it.
+The last two are the reason the banner exists: they report as *passed files*
+while running a third to two-thirds of their tests, so they never appear in the
+skipped count at all.
 
-It also gates `scripts/convert-mapedit-level.mjs`, which runs the original's
-`libs/generate`. Both demos *run* without the legacy tree, because the
-converted level is committed — only re-converting needs it.
+They skip rather than fail, so the suite still goes green. **`tests/harness/announce.ts`
+now prints a banner when the tree is missing**, naming every gated file and
+saying what the run no longer proves — a skipped suite is otherwise just a
+number in the summary, indistinguishable from a full run. Set
+`RAYCASTER_REQUIRE_FIXTURES=1` to turn that banner into a hard failure, for a
+checkout that is meant to be complete.
+
+To restore it, copy the original engine's `libs/`, `apps/` and `games/` into
+`_OLD_PROJECT_/`, or point `LEGACY_ENGINE=/path/to/checkout` at a copy
+elsewhere. `tests/harness/legacy.ts` resolves it.
+
+`scripts/convert-mapedit-level.mjs` **no longer needs it**: the converter is
+`src/mapedit`, this project's own TypeScript port of `libs/generate`.
 
 **2. Check whether phase F is committed.** If `git status` shows
 `src/level/buildObjects.ts` and `src/render/spriteFacing.ts` as untracked, the
