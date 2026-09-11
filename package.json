@@ -52,20 +52,21 @@
     "laboralphy"
   ],
   "author": {
-    "name": "Rapha\u00ebl Marandet",
+    "name": "Raphaël Marandet",
     "email": "raphael.marandet@gmail.com"
   },
   "license": "ISC",
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.8",
     "@types/node": "^26.5.0",
-    "@vitest/coverage-v8": "^3.2.7",
+    "@vitest/coverage-v8": "^5.0.0",
+    "@vitest/mocker": "^5.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.6",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.70.0",
-    "vitest": "^3.2.0"
+    "vitest": "^5.0.0"
   }
 }
