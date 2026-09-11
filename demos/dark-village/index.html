@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>raycaster-386 — dark village</title>
+        <style>
+            :root {
+                color-scheme: dark;
+            }
+            body {
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                background: #14161a;
+                color: #c8ccd4;
+                font:
+                    13px/1.5 ui-monospace,
+                    SFMono-Regular,
+                    Menlo,
+                    Consolas,
+                    monospace;
+            }
+            canvas {
+                width: min(96vw, 960px);
+                aspect-ratio: 320 / 200;
+                height: auto;
+                image-rendering: pixelated;
+                background: #000;
+                border: 1px solid #2a2f38;
+                cursor: crosshair;
+            }
+            #readout {
+                min-height: 1.5em;
+                color: #7d8694;
+            }
+            #status {
+                min-height: 1.5em;
+                color: #d8a657;
+            }
+            kbd {
+                background: #21262e;
+                border: 1px solid #333a44;
+                border-radius: 3px;
+                padding: 1px 5px;
+            }
+            p {
+                margin: 0;
+                color: #7d8694;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="screen" width="320" height="200"></canvas>
+        <div id="readout"></div>
+        <div id="status"></div>
+        <p>
+            <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>&larr;</kbd
+            ><kbd>&rarr;</kbd> turn &nbsp; click to capture the mouse &nbsp; <kbd>E</kbd> use (doors, tags)
+        </p>
+        <script type="module" src="dist/demo.js"></script>
+    </body>
+</html>

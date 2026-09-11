@@ -23,12 +23,20 @@ export function renderSprite(ctx: RenderContext, scene: Scene, sprite: Sprite): 
     const dy = sprite.y - camera.y;
     const fov = camera.fov;
 
-    let alpha = Math.atan2(dy, dx) - camera.direction;
-    if (alpha >= Math.PI) {
-        alpha = -(Math.PI * 2 - alpha);
-    }
-    if (alpha < -Math.PI) {
-        alpha = Math.PI * 2 + alpha;
+    // Reduce the bearing into (-PI, PI] before the range test below.
+    //
+    // `atan2` is already in that interval but `camera.direction` is not: it is
+    // whatever angle the caller has accumulated, and nothing wraps it — a
+    // player who turns keeps winding past 2*PI. The original added or
+    // subtracted 2*PI exactly once (`Renderer.js:1919`), which cannot reduce a
+    // difference that is several revolutions wide, so past about 1.4 net turns
+    // sprites began failing the test and vanishing while the walls — cast with
+    // periodic `cos`/`sin`, which do not care — rendered normally.
+    let alpha = (Math.atan2(dy, dx) - camera.direction) % (Math.PI * 2);
+    if (alpha > Math.PI) {
+        alpha -= Math.PI * 2;
+    } else if (alpha <= -Math.PI) {
+        alpha += Math.PI * 2;
     }
     if (Math.abs(alpha) > fov * 1.5) {
         return;

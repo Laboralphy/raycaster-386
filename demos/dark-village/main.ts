@@ -1,21 +1,22 @@
 import { Canvas } from '../../src';
-import { buildSentinelAtlas } from './spriteAtlas';
-import { TEXTURES, TICK_MS } from './level';
+import type { RceLevel } from '../../src';
+import { LEVEL_URL, TICK_MS } from './level';
 import { World } from './world';
 import { InputManager } from './input';
 
 /** Internal render resolution. The canvas is scaled up by CSS. */
 const WIDTH = 320;
 const HEIGHT = 200;
-
 function hud(world: World, fps: number): string {
     const c = world.cell;
     const door = world.aimedDoor();
+    const tag = world.firedTag;
     return [
         `${fps.toFixed(0)} fps`,
         `cell ${c.x},${c.y}`,
         `doors ${world.doors.contexts.length}`,
         door ? `[E] open door at ${door.x},${door.y}` : '',
+        tag ? `tag: ${[tag.command, ...tag.parameters].join(' ')}` : '',
     ]
         .filter(Boolean)
         .join('   ');
@@ -31,12 +32,23 @@ async function main(): Promise<void> {
     const world = new World();
     world.setScreen(WIDTH, HEIGHT);
 
+    status.textContent = 'loading level...';
+    const response = await fetch(LEVEL_URL);
+    if (!response.ok) {
+        throw new Error(`could not read ${LEVEL_URL}: ${response.status}`);
+    }
+    const data = (await response.json()) as RceLevel;
+
+    // The library performs no I/O: every texture the level names is decoded
+    // here and handed back in. 54 atlases for this one, so it is worth saying
+    // what is happening while it runs.
+    let decoded = 0;
     status.textContent = 'loading textures...';
-    // The renderer performs no I/O: images are decoded here and handed in.
-    const [walls, flats] = await Canvas.loadCanvases([TEXTURES.walls, TEXTURES.flats]);
-    // The sentinel's atlas is drawn rather than loaded, so the demo stays two
-    // asset files.
-    world.build(walls, flats, buildSentinelAtlas());
+    await world.build(data, async (src) => {
+        const [image] = await Canvas.loadCanvases([src]);
+        status.textContent = `loading textures... ${++decoded}`;
+        return image;
+    });
     status.textContent = '';
 
     const target = canvas.getContext('2d') as CanvasRenderingContext2D;

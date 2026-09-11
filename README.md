@@ -10,7 +10,7 @@ verified pixel-for-pixel against the original.
 ```bash
 npm install
 npm run check      # typecheck + test + build
-npm run demo       # playable demo on http://localhost:8080 (demos/simple)
+npm run demo       # playable demos on http://localhost:8080 (simple, dark-village)
 npm run bench      # port vs the original engine
 npm run build      # dist/index.js + dist/simulation.js
 ```
@@ -273,6 +273,18 @@ Two more surfaced later:
   several neighbours could push it first — and the starting cell was pushed
   twice outright, guaranteeing a duplicate in every result. Marking on push
   fixes both and halves the work on any region wider than a corridor.
+- **Sprites vanished once the camera had turned enough.** A sprite's bearing
+  was reduced into (-PI, PI] by adding or subtracting `2 * PI` exactly once,
+  but a camera angle is accumulated and never wrapped — both this port's
+  `PlayerThinker` and the original's `FPSControlThinker` just do `angle +=`.
+  One correction cannot close a gap several revolutions wide, so past ~1.38 net
+  turns sprites started failing the off-axis test and disappearing; past ~1.62
+  every sprite was gone. Between the two lay a narrow band where *some* went
+  and the rest stayed, which is what made it look like one bad sprite rather
+  than a broken renderer. The walls never showed it: they are cast with
+  periodic `cos`/`sin`, which do not care what the angle winds to. The port
+  reduces with a modulo. Found by playing `demos/dark-village`, not by a
+  test — the first one that was.
 - **`quoteSplit` returned its input when nothing matched.** An empty tag came
   back as `''` rather than `[]`, so a caller taking the command off the front
   got a character instead of a word.

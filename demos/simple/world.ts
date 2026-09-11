@@ -1,7 +1,7 @@
 import { MapHelper, Renderer, SpriteBinding, worldToCell } from '../../src';
 import type { ActorFrame, ReadonlyCellMap } from '../../src';
 import { Actor, ActorRegistry, DoorPolicy } from '../../src/simulation';
-import { LEVEL, METRICS, SHADING, START } from './level.js';
+import { LEVEL, METRICS, SHADING, START, TICK_MS } from './level.js';
 import { SENTINEL_FACINGS, SENTINEL_TILE_HEIGHT, SENTINEL_TILE_WIDTH } from './spriteAtlas.js';
 import { PlayerThinker, SentinelThinker } from './thinkers.js';
 import { type Input } from './input';
@@ -207,6 +207,12 @@ export class World {
         // Handoff 2 — actors: one call moves every bound sprite, its light,
         // and its facing.
         this.binding.apply(frame, this.player.position);
+
+        // The renderer holds animation frames but advances nothing itself, so
+        // the clock is the simulation's. Nothing here animates yet — the
+        // sentinel's is a single frame — but a demo copied from this one
+        // would otherwise find its animations frozen.
+        this.renderer.computeAnimations(TICK_MS);
     }
 
     /** Draws the current state. */

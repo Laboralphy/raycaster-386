@@ -478,8 +478,7 @@ a directory with its own `index.html` and `main.ts`, so one can be rewritten
 without disturbing the others.
 
 ```bash
-npm run demo             # builds and serves demos/simple
-npm run demo -- lights   # any other directory under demos/
+npm run demo             # builds every demo, one route each
 npm run demo:watch       # rebuilds on change
 ```
 

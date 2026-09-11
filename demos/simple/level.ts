@@ -42,6 +42,13 @@ export const LEVEL: LevelMap = {
 
 export const METRICS = { spacing: 64, height: 96 };
 
+/**
+ * Simulation rate. Doors are written in ticks, so this must be fixed — and it
+ * is also the animation clock, since `Renderer.computeAnimations` takes the
+ * same unit an animation's `duration` is in.
+ */
+export const TICK_MS = 1000 / 60;
+
 export const SHADING = {
     shades: 16,
     color: '#000000',
