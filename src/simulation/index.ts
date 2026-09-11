@@ -26,6 +26,7 @@ export type { DoorCellUpdate, DoorManagerStateEntry } from './DoorManager.js';
 export { DoorPolicy } from './DoorPolicy.js';
 export type {
     DoorPolicyOptions,
+    DoorShapeOverride,
     DoorPolicyEvents,
     DoorMetrics,
     DoorPolicyState,

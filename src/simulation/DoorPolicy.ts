@@ -13,6 +13,7 @@ import {
 import type { ReadonlyCellMap } from '../core/CellMap.js';
 import { MarkerRegistry } from '../core/MarkerRegistry.js';
 import { DOOR_MAINTAIN_DURATION, DOOR_SLIDING_DURATION } from './consts.js';
+import type { EasingFunction, EasingName } from './Easing.js';
 import { DoorContext, type DoorCloseCheck } from './DoorContext.js';
 import { DoorManager, type DoorCellUpdate, type DoorManagerStateEntry } from './DoorManager.js';
 import { CELL_NEIGHBOR_SIDE, forEachNeighbor } from './neighbors.js';
@@ -40,6 +41,44 @@ export interface DoorPolicyOptions {
     slidingDuration?: number;
     /** How long an autoclosing door stays open, in ticks. */
     maintainDuration?: number;
+    /**
+     * How an ordinary door accelerates as it slides open. Defaults to
+     * `smoothstep` — ease-in-out, and what the original used for every door.
+     *
+     * A secret passage is deliberately not covered: its two halves use paired
+     * accelerating and decelerating curves so the effect reads as one wall
+     * recessing and shoving its neighbour back, and a single shared easing
+     * would flatten that into two walls moving alike.
+     */
+    openFunction?: EasingName | EasingFunction;
+    /**
+     * How it decelerates as it slides shut. Left out, the close replays
+     * {@link openFunction} reversed, which is what a door usually wants.
+     */
+    closeFunction?: EasingName | EasingFunction | null;
+    /**
+     * The character of one kind of door, keyed however the game likes.
+     *
+     * A phys code says a cell *is* a door and how it opens; it does not say
+     * whether this one is a light wooden door or a heavy stone slab. The level
+     * already distinguishes them — they are different blocks — so this is
+     * handed the cell's block code alongside its phys code, and returns
+     * whatever it wants to change. `null` means "the usual".
+     *
+     * A callback rather than a table for the same reason as
+     * {@link isCellOccupied}: door policy must not assume how a game
+     * identifies things. Block codes are assigned per level, so a game with
+     * several levels will want to key on something of its own — `ref` from
+     * `loaded.materials`, say — and that is its business, not this layer's.
+     *
+     * Asked **once**, when the door is first opened: travel and speed are
+     * fixed for the life of that door. Re-opening asks again.
+     *
+     * Secret passages do not consult it. Their two halves run paired
+     * accelerating and decelerating curves against each other, and a single
+     * override would flatten the effect into two walls moving alike.
+     */
+    doorShape?: (code: number, phys: number) => DoorShapeOverride | null;
 }
 
 export interface DoorPolicyEvents extends Record<string, unknown[]> {
@@ -69,6 +108,21 @@ interface DoorShape {
 }
 
 /**
+ * What a game may say about one kind of door, over and above its phys code.
+ *
+ * Every field is optional and falls back to the phys-derived default, so a
+ * caller overriding only `openFunction` keeps the travel and speed it had.
+ */
+export interface DoorShapeOverride {
+    /** How far it slides, in world units. */
+    offsetMax?: number;
+    /** Sliding time as a multiple of the policy's base duration. */
+    slideFactor?: number;
+    openFunction?: EasingName | EasingFunction;
+    closeFunction?: EasingName | EasingFunction | null;
+}
+
+/**
  * Decides which cells are doors, and opens, closes and locks them.
  *
  * {@link DoorContext} animates one door; this is the layer that reads a cell's
@@ -87,6 +141,9 @@ export class DoorPolicy {
     private readonly _occupied: (x: number, y: number) => boolean;
     private readonly _slidingDuration: number;
     private readonly _maintainDuration: number;
+    private readonly _openFunction: EasingName | EasingFunction;
+    private readonly _closeFunction: EasingName | EasingFunction | null;
+    private readonly _doorShape: (code: number, phys: number) => DoorShapeOverride | null;
     private readonly _locks = new MarkerRegistry();
 
     constructor({
@@ -95,12 +152,18 @@ export class DoorPolicy {
         isCellOccupied = () => false,
         slidingDuration = DOOR_SLIDING_DURATION,
         maintainDuration = DOOR_MAINTAIN_DURATION,
+        openFunction = 'smoothstep',
+        closeFunction = null,
+        doorShape = () => null,
     }: DoorPolicyOptions) {
         this._map = map;
         this._metrics = metrics;
         this._occupied = isCellOccupied;
         this._slidingDuration = slidingDuration;
         this._maintainDuration = maintainDuration;
+        this._openFunction = openFunction;
+        this._closeFunction = closeFunction;
+        this._doorShape = doorShape;
     }
 
     /** Every door currently live, in registration order. */
@@ -292,15 +355,21 @@ export class DoorPolicy {
         if (phys === PHYS_SECRET_BLOCK) {
             return this.buildSecretDoorContext(x, y);
         }
+        // The phys code still decides *whether* this is a door; the override
+        // only refines one that already is. Keeping that split is what lets
+        // `isDoor`, the lock registry and the renderer go on trusting phys.
         const shape = this.shapeOf(phys);
         if (shape === null) {
             return null;
         }
+        const over = this._doorShape(this._map.getMaterial(x, y), phys) ?? {};
         const dc = new DoorContext({
-            slidingDuration: (this._slidingDuration * shape.slideFactor) | 0,
+            slidingDuration:
+                (this._slidingDuration * (over.slideFactor ?? shape.slideFactor)) | 0,
             maintainDuration: autoclose ? this._maintainDuration : Infinity,
-            offsetMax: shape.offsetMax,
-            openFunction: 'smoothstep',
+            offsetMax: over.offsetMax ?? shape.offsetMax,
+            openFunction: over.openFunction ?? this._openFunction,
+            closeFunction: over.closeFunction ?? this._closeFunction,
         });
         dc.data.x = x;
         dc.data.y = y;

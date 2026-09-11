@@ -32,7 +32,7 @@ work described under "Rendering" below is local only.
 
 ## State
 
-256 tests, 25 files. `npm run check` is typecheck (three configs) + tests +
+271 tests, 26 files. `npm run check` is typecheck (three configs) + tests +
 build. Bundles: `dist/index.js` (rendering, ~111 kB), `dist/simulation.js`
 (~35 kB), `dist/schema.js` (the RCE-100 schema, ~22 kB).
 
@@ -67,9 +67,16 @@ reference there fails the build.
 **Rendering is complete.** A saved level loads with its architecture, decals,
 lights and scenery — `mans-cabin`'s 89 objects included.
 
-Simulation is 1,770 lines with 1,234 lines of tests: doors that open, close,
-lock, autoclose, refuse to shut on an occupant, run secret passages and
-save/restore; wall sliding; actor-vs-actor collision over a sector grid.
+Simulation is ~1,790 lines: doors that open, close, lock, autoclose, refuse to
+shut on an occupant, run secret passages and save/restore; wall sliding;
+actor-vs-actor collision over a sector grid.
+
+A door's easing is a `DoorPolicy` option as of 2026-09-11 — `openFunction` and
+`closeFunction`, defaulting to `smoothstep` (ease-in-out, what the original
+gave every door) and to replaying the open curve reversed. A secret passage is
+deliberately outside it: its halves use paired accelerating and decelerating
+curves so the effect reads as one wall shoving another, and one shared easing
+would flatten that.
 
 ### The demos
 
@@ -216,20 +223,15 @@ geometry, flood fill.
 
 ### What is worth doing next, in rough order
 
-1. **`DoorPolicy` has only unit coverage** — the largest ported surface never
-   got a differential test, because its original could not be isolated from
-   `Engine.js`, and that option has now expired with the legacy tree. Golden
-   coverage of doors mid-slide exists (`doors--*`, `doorAnimation.test.ts`);
-   what is missing is the policy's decision logic under load.
-2. **Package it**: the version is still 0.1.0 and nothing has been published.
-3. **Decide whether `_OLD_PROJECT_` stays in the repo.** It is tracked — 1010
+1. **Package it**: the version is still 0.1.0 and nothing has been published.
+2. **Decide whether `_OLD_PROJECT_` stays in the repo.** It is tracked — 1010
    files, 26 MB on disk — and nothing reads it any more. Removing it is an
    ordinary commit, recoverable from history; the argument for keeping it is
    that it is the only copy of the engine this port replaces.
 
 Done since this list was written: a second demo (`dark-village`), the vitest
-upgrade (now 5.0.0), and the four steps that retire the legacy tree — see
-below.
+upgrade (now 5.0.0), the four steps that retire the legacy tree (below), and
+`DoorPolicy`'s missing coverage (`tests/simulation/doorShapes.test.ts`).
 
 ### Retiring `_OLD_PROJECT_`
 
@@ -269,23 +271,35 @@ re-recording.
 - **Shared `CellMap` writes** bypass the light re-trace. Mitigated: the
   accessor returns a `ReadonlyCellMap` view, so it will not compile. A
   determined cast still defeats it.
-- **`DoorPolicy` has no differential test.** The largest ported surface with
-  only unit coverage, because its logic lives in `Engine.js` methods that
-  cannot be isolated without standing up the whole `Engine`. Every bug found so
-  far came from tests, and three of the last four from *differential* tests.
-- **Pre-existing lint debt**: 20 `curly` errors, all `--fix`-able, now entirely
-  in older test files — `tests/harness/compare.ts`, `tests/simulation/doors*`,
-  `tests/demos/simple/world.test.ts`. None in `src/`, and none left in `demos/`
-  since the prettier pass. Down from 20: four went with the retired suite.
+- ~~**`DoorPolicy` has no differential test.**~~ Closed 2026-09-11, though not
+  as a differential test. Bundling `Engine.js` fails on five unresolved imports
+  — including `jsonschema`, which the legacy tree has no `node_modules` for —
+  and `_buildDoorContext` needs `initializeRenderer()`, which stands up
+  Renderer, DoorManager, TagManager, Scheduler, Horde and a camera. Standing
+  all that up to check a decision table did not justify reinstating the retired
+  harness. `tests/simulation/doorShapes.test.ts` pins the table instead, every
+  number cited to `Engine.js:337-370` and `:252`. The gap it closes is real and
+  was measured: with the 1.5 and 1.8 sliding factors swapped, all 23 existing
+  door tests pass and the new suite fails 5 — up/down and curtain doors travel
+  identically and were told apart by nothing.
+- **Pre-existing lint debt**: 16 `curly` errors, all `--fix`-able, entirely in
+  older test files — `tests/harness/compare.ts` (4),
+  `tests/simulation/doors.test.ts` (4), `tests/renderer/port.golden.test.ts`
+  (4), `tests/demos/simple/world.test.ts` (3),
+  `tests/simulation/doorIntegration.test.ts` (1). None in `src/` or `demos/`.
+  Down from 20; four went with the retired suite.
 - **`dark-village` keeps its MapEdit save but not its tiles.**
   `assets/levels/level-1.json` is back — it is the fidelity fixture for
   `src/mapedit` — but the 2.1 MB of unmerged source tiles it was built from are
   not. So the level can be *converted* (the converter is `src/mapedit` and needs
   nothing external) but not *re-atlased*: editing it means re-importing the
   tiles.
-- **The README's benchmark table is stale** — it lists 7 scenes and +3.1%;
-  `npm run bench` now runs 10, including `animated-flats` where the original
-  mis-samples and the port is ~47% faster. The port is faster overall either
+- **The README's benchmark table describes a comparison that no longer runs.**
+  It reports the port against the original per scene (+3.1% overall), but
+  `npm run bench` now measures the port against its own recorded baseline —
+  the original is gone. The measurements were true when taken and are worth
+  keeping as history; the section needs a line saying so. The port is faster
+  either
   way.
 
 ## Bugs found so far

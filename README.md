@@ -336,9 +336,14 @@ slice three times when given fewer than three.
 
 ### Performance
 
-`npm run bench` measures the port against the original on the same scenes,
-headless. The port is **~3% faster overall**, and its rasteriser — 90% of a
-frame — is **~15% faster**:
+The port is **~3% faster overall** than the original, and its rasteriser — 90%
+of a frame — is **~15% faster**. The table below is the measurement that
+established that, taken while both engines could still be run side by side.
+
+It is history now: the original was retired on 2026-09-11, and `npm run bench`
+measures the port against its own recorded baseline in
+`tests/bench/baseline.json` instead, reporting each scene's cost as a multiple
+of `room` so the comparison survives moving between machines.
 
 ```
   room        original 1.293  port 1.215  +6.0%
