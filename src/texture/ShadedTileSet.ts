@@ -6,9 +6,15 @@ import {
     applyFilter,
     type ImageSource,
 } from '../core/canvas.js';
-import { parse, rgba } from '../core/Rainbow.js';
+import { Rainbow } from '@laboralphy/rainbow';
 
 const DEFAULT_SHADING_LAYERS = 16;
+
+/**
+ * Converts a [0, 1] channel into the colour-filter factor the pipeline wants,
+ * where an 8-bit channel of 128 means "leave this channel alone".
+ */
+const NEUTRAL = 255 / 128;
 
 /** Shading parameters a tileset was last computed with. */
 export interface ShadingParams {
@@ -191,9 +197,11 @@ export class ShadedTileSet {
     ): HTMLCanvasElement {
         const shaded = cloneCanvas(image);
         if (filter) {
-            const f = parse(filter);
-            // 128 is neutral: a channel at 128 leaves that channel unchanged.
-            applyColorFilter(shaded, f.r / 128, f.g / 128, f.b / 128);
+            const f = Rainbow.convertToRGBA(Rainbow.parse(filter));
+            // 128 of 255 is neutral: a channel there leaves that channel
+            // unchanged. Rainbow reports channels in [0, 1], so the factor is
+            // scaled back up rather than divided by 128 directly.
+            applyColorFilter(shaded, f.r * NEUTRAL, f.g * NEUTRAL, f.b * NEUTRAL);
         }
         this.applyFogShading(shaded, level);
         return shaded;
@@ -211,9 +219,13 @@ export class ShadedTileSet {
 
 /** Builds the CSS fill style for one fog level. */
 function computeFogStyle(color: string, factor: number): string {
-    const c = parse(color);
-    c.a = (factor * 255) | 0;
-    return rgba(c);
+    const c = Rainbow.convertToRGBA(Rainbow.parse(color));
+    // Deliberately not Rainbow.renderRGBA: it rounds alpha to three decimals,
+    // and the fog factor is quantised to a 255th (0.2980392… for level 76).
+    // Rounding it to 0.298 shifts the composite by one unit on nearly half the
+    // pixels in a scene — eleven golden baselines caught exactly that.
+    const a = (factor * 255) | 0;
+    return `rgba(${c.r * 255}, ${c.g * 255}, ${c.b * 255}, ${a / 255})`;
 }
 
 /**

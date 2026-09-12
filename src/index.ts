@@ -4,8 +4,6 @@ export { MarkerRegistry } from './core/MarkerRegistry.js';
 export { Grid } from './core/Grid.js';
 export { line as bresenhamLine } from './core/bresenham.js';
 export { distance, squareDistance, circleInRect, linear } from './core/geometry.js';
-export * as Rainbow from './core/Rainbow.js';
-export type { RGBA } from './core/Rainbow.js';
 export * as Canvas from './core/canvas.js';
 export type { ImageSource, FilterColor } from './core/canvas.js';
 

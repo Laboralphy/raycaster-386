@@ -57,7 +57,7 @@
     "laboralphy"
   ],
   "author": {
-    "name": "Rapha\u00ebl Marandet",
+    "name": "Raphaël Marandet",
     "email": "raphael.marandet@gmail.com"
   },
   "license": "ISC",
@@ -70,6 +70,7 @@
     "url": "https://github.com/Laboralphy/raycaster-386/issues"
   },
   "devDependencies": {
+    "@laboralphy/rainbow": "^3.0.0",
     "@napi-rs/canvas": "^1.0.8",
     "@types/node": "^26.5.0",
     "@vitest/coverage-v8": "^5.0.0",
