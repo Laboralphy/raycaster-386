@@ -364,8 +364,7 @@ export class DoorPolicy {
         }
         const over = this._doorShape(this._map.getMaterial(x, y), phys) ?? {};
         const dc = new DoorContext({
-            slidingDuration:
-                (this._slidingDuration * (over.slideFactor ?? shape.slideFactor)) | 0,
+            slidingDuration: (this._slidingDuration * (over.slideFactor ?? shape.slideFactor)) | 0,
             maintainDuration: autoclose ? this._maintainDuration : Infinity,
             offsetMax: over.offsetMax ?? shape.offsetMax,
             openFunction: over.openFunction ?? this._openFunction,

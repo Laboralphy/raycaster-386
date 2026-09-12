@@ -1,0 +1,7 @@
+dist/
+node_modules/
+_OLD_PROJECT_/
+
+# Generated level data: written by the map exporter, not by hand. Reformatting
+# it would churn hundreds of KB of diff and gain nothing readable.
+demos/*/assets/**

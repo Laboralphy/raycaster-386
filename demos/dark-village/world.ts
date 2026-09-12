@@ -1,7 +1,5 @@
 import { Renderer, SpriteBinding, buildObjects, loadLevel, worldToCell } from '../../src';
-import type {
-    ActorFrame, LoadedLevel, PlacedObject, ReadonlyCellMap, RceLevel
-} from '../../src';
+import type { ActorFrame, LoadedLevel, PlacedObject, ReadonlyCellMap, RceLevel } from '../../src';
 import { Actor, ActorRegistry, DoorPolicy, TagTriggers } from '../../src/simulation';
 import type { TagEvent } from '../../src/simulation';
 import { DOOR_MAINTAIN, PLAYER_RADIUS, REACH, TICK_MS } from './level.js';
@@ -87,7 +85,7 @@ export class World {
             map: rc.cellMap,
             metrics: data.level.metrics,
             maintainDuration: DOOR_MAINTAIN,
-            isCellOccupied: (x, y) => this.actors.actorsAt(x, y).length > 0
+            isCellOccupied: (x, y) => this.actors.actorsAt(x, y).length > 0,
         });
 
         // The level's tagged cells, lifted into the trigger grid. The two here
@@ -112,7 +110,7 @@ export class World {
             y: (start.y + 0.5) * this._spacing,
             angle: start.angle,
             size: PLAYER_RADIUS,
-            ref: 'player'
+            ref: 'player',
         });
         this._player.thinker = new PlayerThinker();
     }
@@ -157,7 +155,7 @@ export class World {
             map: this.renderer.cellMap,
             spacing: this._spacing,
             time: this._time,
-            input
+            input,
         };
     }
 

@@ -12,6 +12,14 @@
 export { convertMapEditLevel, mapEditVersionOf } from './generate.js';
 export { MAPEDIT_1, MAPEDIT_VERSIONS } from './types.js';
 export type {
-    ImageAppender, MapEditBlock, MapEditCell, MapEditCellThing, MapEditLevel,
-    MapEditLight, MapEditStartpoint, MapEditThing, MapEditTile, MapEditVersion
+    ImageAppender,
+    MapEditBlock,
+    MapEditCell,
+    MapEditCellThing,
+    MapEditLevel,
+    MapEditLight,
+    MapEditStartpoint,
+    MapEditThing,
+    MapEditTile,
+    MapEditVersion,
 } from './types.js';

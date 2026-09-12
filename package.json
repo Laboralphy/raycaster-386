@@ -12,15 +12,15 @@
       "import": "./dist/index.js"
     },
     "./simulation": {
-      "types": "./dist/simulation.d.ts",
+      "types": "./dist/simulation/index.d.ts",
       "import": "./dist/simulation.js"
     },
     "./schema": {
-      "types": "./dist/schema.d.ts",
+      "types": "./dist/level/schema.d.ts",
       "import": "./dist/schema.js"
     },
     "./mapedit": {
-      "types": "./dist/mapedit.d.ts",
+      "types": "./dist/mapedit/index.d.ts",
       "import": "./dist/mapedit.js"
     }
   },
@@ -30,7 +30,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "watch": "node scripts/build.mjs --watch",
-    "types": "tsc -p tsconfig.json --emitDeclarationOnly --declaration --outDir dist",
+    "types": "tsc -p tsconfig.json --emitDeclarationOnly --declaration --noEmit false --outDir dist",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.simulation.json && tsc -p tsconfig.tests.json",
     "lint": "eslint src demos",
     "lint:fix": "eslint --fix src demos",
@@ -39,6 +39,7 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.include='src/**' --coverage.reporter=text",
     "check": "npm run typecheck && npm run test && npm run build",
+    "prepublishOnly": "npm run check && npm run types",
     "test:watch": "vitest",
     "bench": "vitest run --config vitest.bench.config.ts",
     "demo": "node scripts/demo.mjs",
@@ -56,10 +57,18 @@
     "laboralphy"
   ],
   "author": {
-    "name": "Raphaël Marandet",
+    "name": "Rapha\u00ebl Marandet",
     "email": "raphael.marandet@gmail.com"
   },
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Laboralphy/raycaster-386.git"
+  },
+  "homepage": "https://github.com/Laboralphy/raycaster-386#readme",
+  "bugs": {
+    "url": "https://github.com/Laboralphy/raycaster-386/issues"
+  },
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.8",
     "@types/node": "^26.5.0",
