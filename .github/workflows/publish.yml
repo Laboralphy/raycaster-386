@@ -1,0 +1,46 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for npm provenance via OIDC.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - run: npm ci
+
+      # The release tag is the only thing that says which version to publish,
+      # but npm publishes whatever package.json holds. Fail loudly on a
+      # mismatch rather than shipping the wrong version or hitting a confusing
+      # "cannot publish over existing version" later.
+      - name: Check tag matches package.json
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p 'require("./package.json").version')"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::release tag $GITHUB_REF_NAME (version $TAG) does not match package.json version $PKG"
+            exit 1
+          fi
+          echo "publishing version $PKG"
+
+      # dist/ is gitignored, so the tarball is built here. prepublishOnly runs
+      # these again as a safety net; running them as their own steps means a
+      # failure names itself instead of hiding inside the publish log.
+      - run: npm run check
+
+      - run: npm run types
+
+      - run: npm publish --provenance --access public
