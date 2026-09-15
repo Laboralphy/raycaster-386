@@ -45,7 +45,7 @@ function mask(doc: Record<string, unknown>): Record<string, unknown> {
  * decals, a 59x59 grid with an upper storey.
  *
  * This is the one test that proves *fidelity* rather than plausibility, and it
- * is the reason to keep the save committed: once `_OLD_PROJECT_` is gone, this
+ * is the reason to keep the save committed: with the original engine gone, this
  * pair is the only remaining evidence that the port matches what it replaced.
  *
  * If the save is missing this suite skips, and `tests/harness/announce.ts`

@@ -179,10 +179,6 @@ original while it was still there, enforced by `tests/renderer/port.golden.test.
 `tests/golden/README.md` explains where each came from and why seven of them
 deliberately differ from the original's output.
 
-These tests skip when that checkout is absent. `TileAnimation` and `Rainbow`
-are currently pinned this way — including all 148 colour-table entries, which
-were transcribed mechanically rather than by hand.
-
 ### Golden images
 
 `tests/golden/` holds one committed PNG per (scene, camera) pair, captured

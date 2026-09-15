@@ -3,13 +3,10 @@
 Everything the original engine does, sorted by which tier it belongs to, so that
 scope stays a decision that can be revisited rather than an assumption.
 
-**Historical.** This inventory was written while the original was still
-vendored, and its references to `_OLD_PROJECT_/` and `tests/differential/`
-describe what was true during the migration. Both were retired on 2026-09-11;
-see PROGRESS.md. Nothing in the repo reads the legacy tree any more.
-
-Source of truth was `_OLD_PROJECT_/`, the imported copy of the original
-`o876-raycaster-engine`. Line numbers refer to it and were measured.
+**Historical.** This inventory was written during the migration, against an
+imported copy of the original `o876-raycaster-engine` that is no longer in the
+repo; its references to `tests/differential/` describe what was true then. See
+PROGRESS.md. Line numbers refer to that copy and were measured.
 
 **Totals.** `libs/engine/` is 3,668 lines, of which `Engine.js` alone is 1,529.
 The collision, tag and geometry machinery it pulls from `libs/` adds ~1,100.

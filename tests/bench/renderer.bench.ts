@@ -9,8 +9,8 @@ import { compare, report } from './harness.js';
  * The renderer against its own recorded cost.
  *
  * This used to time the port against the original engine, which answered "is
- * the port fast enough to replace it" — a migration question, now settled and
- * gone along with `_OLD_PROJECT_`. The question that outlives it is "did this
+ * the port fast enough to replace it" — a migration question, now settled.
+ * The question that outlives it is "did this
  * change make something slower", and answering it needs a record of the last
  * measurement rather than a second implementation.
  *

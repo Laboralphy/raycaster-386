@@ -9,7 +9,7 @@ Regenerate with `UPDATE_GOLDEN=1 npm test`.
 ## Where they came from, and what that means now
 
 Every one was captured from the **original** `o876-raycaster-engine` while it
-was still vendored at `_OLD_PROJECT_/`, through a harness that ran both
+was still part of this repository, through a harness that ran both
 renderers on the same scene and compared them pixel for pixel. That harness and
 the original were removed on 2026-09-11, once the port stopped being a
 migration and started being the thing itself.

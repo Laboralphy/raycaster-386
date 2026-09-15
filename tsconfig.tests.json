@@ -1,8 +1,8 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    /* Tests run under Node: the differential harness reads the original
-       engine off disk and bundles it. The library itself never sees these. */
+    /* Tests run under Node: they read fixtures off disk and render through
+       @napi-rs/canvas. The library itself never sees these. */
     "types": ["node"]
   },
   "include": ["src", "tests", "demos", "vitest.bench.config.ts"]

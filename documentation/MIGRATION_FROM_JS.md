@@ -188,12 +188,10 @@ The port renders the same cases and is compared with **tolerance 0**.
 ```bash
 npm test                     # compare against committed baselines
 UPDATE_GOLDEN=1 npm test     # recapture
-LEGACY_ENGINE=/path/... npm test   # point at the original engine checkout
 ```
 
 A mismatch writes actual / expected / diff PNGs to `.golden-out/` with a pixel
-count, max channel delta and bounding box. Differential tests skip when the
-original engine is not checked out alongside.
+count, max channel delta and bounding box.
 
 The harness is self-checked: it proves the comparator detects a one-degree
 rotation, a half-pixel translation and a single flipped bit, and that its PNG

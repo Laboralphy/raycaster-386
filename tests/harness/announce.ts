@@ -7,11 +7,6 @@ import { resolve } from 'node:path';
  * Vitest reports a skipped suite as a number and exits 0, so a run missing a
  * fixture prints a green summary indistinguishable from a full one.
  *
- * This used to cover the original engine as well, when nine test files were
- * gated on `_OLD_PROJECT_` being present. They are gone: the level fixtures
- * were vendored and the differential suites retired on 2026-09-11. What is
- * left is the one fixture that is still optional.
- *
  * A `globalSetup` rather than a test, so it prints once, before anything runs,
  * whatever reporter is in use.
  */

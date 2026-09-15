@@ -5,21 +5,17 @@ give you. The feature-by-feature plan lives in
 [ENGINE_INVENTORY.md](ENGINE_INVENTORY.md); this is the shorter "pick it up
 from here".
 
-Last updated 2026-09-11. The demo was moved onto thinkers, then split so input
+Last updated 2026-09-15. The demo was moved onto thinkers, then split so input
 lives in its own class; a second demo was added on a real MapEdit level. The
 last phase in the plan was E.
 
 ## Read this first
 
-**`_OLD_PROJECT_/` is no longer read by anything.** It is the imported copy of
-the original `o876-raycaster-engine` — and it is *tracked*, 1010 files and
-26 MB, so every clone has it. It was the reference for every differential test,
-the source of the golden baselines, and where the mansion levels lived. All
-three dependencies were retired on 2026-09-11; see "Retiring `_OLD_PROJECT_`"
-below. It is now a reading reference and nothing more: no script, test or build
-touches it, and `npm run check` passes with it deleted.
-
-Whether it stays in the repo is an open question — see the next-steps list.
+**The original `o876-raycaster-engine` is no longer in the repo.** It was the
+reference for every differential test, the source of the golden baselines, and
+where the mansion levels lived. All three dependencies were retired on
+2026-09-11 (see "Retiring the original engine" below), and the imported copy
+was deleted on 2026-09-15. It is recoverable from git history only.
 
 The one optional fixture left is `demos/dark-village/assets/levels/level-1.json`,
 the MapEdit save behind that demo's level. Without it `tests/mapedit/fidelity.test.ts`
@@ -224,20 +220,17 @@ geometry, flood fill.
 ### What is worth doing next, in rough order
 
 1. **Package it**: the version is still 0.1.0 and nothing has been published.
-2. **Decide whether `_OLD_PROJECT_` stays in the repo.** It is tracked — 1010
-   files, 26 MB on disk — and nothing reads it any more. Removing it is an
-   ordinary commit, recoverable from history; the argument for keeping it is
-   that it is the only copy of the engine this port replaces.
 
 Done since this list was written: a second demo (`dark-village`), the vitest
-upgrade (now 5.0.0), the four steps that retire the legacy tree (below), and
+upgrade (now 5.0.0), the four steps that retire the original engine (below), and
 `DoorPolicy`'s missing coverage (`tests/simulation/doorShapes.test.ts`).
 
-### Retiring `_OLD_PROJECT_`
+### Retiring the original engine
 
 Decided 2026-09-11: the original is obsolete and the port evolves on its own.
 Differential testing is a *migration* technique, and the migration is over.
-Three of the four steps are done:
+All four steps are done, and the imported copy itself was deleted on
+2026-09-15:
 
 1. **Port `libs/generate`** — done. `src/mapedit`, its own entry point, with a
    fidelity test proving it reproduces the original converter field for field

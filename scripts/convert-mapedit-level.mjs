@@ -9,8 +9,7 @@
  * strings. See documentation/MAPEDIT_ANALYSIS.md.
  *
  * The conversion itself is `src/mapedit`, this project's own TypeScript port
- * of the original engine's `libs/generate`. **It no longer needs
- * `_OLD_PROJECT_`.**
+ * of the original engine's `libs/generate`.
  *
  * `convertMapEditLevel` performs no image work: it asks an appender to combine
  * tiles, and this supplies one over @napi-rs/canvas. The browser editor's own

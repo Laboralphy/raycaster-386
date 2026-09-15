@@ -1,6 +1,6 @@
 # MapEdit: what it is, and what a replacement would take
 
-An analysis of `_OLD_PROJECT_/apps/mapedit`, the web level editor that produced
+An analysis of `apps/mapedit` in the original `o876-raycaster-engine`, the web level editor that produced
 every level in `games/mansion`. Written to answer one question: modernise it in
 place, or start again with `raycaster-386` as a dependency?
 
@@ -183,7 +183,7 @@ either matched something or silently did not.
   "templates survive, logic doesn't" is true, and here the logic is 5:1.
 - **Vue 2 reached end of life**, so this is not optional if the app is to be
   maintained.
-- **There is no build configuration to migrate.** `_OLD_PROJECT_` contains no
+- **There is no build configuration to migrate.** The original contains no
   `package.json` and no webpack config for mapedit — the app lived at the old
   repo root, and only `games/mansion/webpack.config.js` came across. Tooling is
   built from scratch either way, which removes most of the usual argument for
@@ -342,14 +342,10 @@ The demos are a deliberate exercise; an editor has real requirements.
 
 # What to keep from the old app while doing it
 
-`_OLD_PROJECT_/apps/mapedit` should stay in this repository as reference for as
-long as the new editor is being written — its templates and its 730 lines of
-canvas code are the specification. Nothing in the test suite touches it, so it
-costs 1.3 MB and nothing else.
-
-This is the counter-argument to deleting `_OLD_PROJECT_` wholesale, which
-`PROGRESS.md` lists as an open question. The engine half is genuinely obsolete;
-the editor half is about to become a specification.
+Its templates and its 730 lines of canvas code are the specification for as long
+as the new editor is being written. The copy that lived in this repository was
+deleted on 2026-09-15; read them from git history or the original
+`o876-raycaster-engine` repository.
 
 # Open questions worth settling early
 
