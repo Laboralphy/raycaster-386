@@ -118,7 +118,7 @@ the map keeps the writable `CellMap`; a headless caller with no renderer has no
 buffers to keep in step and writes freely.
 
 `CellMap` is also bounds-checked now, which it was not when it was extracted —
-see the note in the README's bug list. That defect was introduced by this port
+see the note in the bug list in [PORT_NOTES.md](PORT_NOTES.md). That defect was introduced by this port
 rather than inherited: the original stored the map as an array of arrays, where
 `this._map[y][x]` with a bad `y` threw a TypeError, and flattening it to a
 `Uint32Array` for speed turned a loud failure into a silent one.
@@ -514,7 +514,7 @@ Depends on: `@laboralphy/grid` (**ported**), `libs/quote-split` (15, parses
 Core. Tags are interned against numeric ids, so the same text over a whole room
 is one id and retiring it is one `removeTagRegion`. Off-map reads answer as an
 empty cell rather than throwing, which matters because an actor's previous cell
-starts at (-1, -1). Two bugs came out of it — see the README's list.
+starts at (-1, -1). Two bugs came out of it — see the list in [PORT_NOTES.md](PORT_NOTES.md).
 
 ### 4.9 Trigger dispatch — **done**
 

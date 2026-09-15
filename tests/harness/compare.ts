@@ -88,10 +88,18 @@ export function compareFrames(a: Frame, b: Frame, tolerance = 0): Diff {
             if (firstDiffAt === null) {
                 firstDiffAt = { x, y };
             }
-            if (x < x0) x0 = x;
-            if (y < y0) y0 = y;
-            if (x > x1) x1 = x;
-            if (y > y1) y1 = y;
+            if (x < x0) {
+                x0 = x;
+            }
+            if (y < y0) {
+                y0 = y;
+            }
+            if (x > x1) {
+                x1 = x;
+            }
+            if (y > y1) {
+                y1 = y;
+            }
         }
     }
     return {

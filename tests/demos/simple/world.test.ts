@@ -135,7 +135,9 @@ describe('demo world', () => {
             w.update(idle);
             w.render();
             const frame = grab(w);
-            if (!isClean(compareFrames(previous, frame))) ++changed;
+            if (!isClean(compareFrames(previous, frame))) {
+                ++changed;
+            }
             previous = frame;
         }
         expect(dc.isOpen(), 'the door never finished opening').toBe(true);
@@ -165,12 +167,16 @@ describe('demo world', () => {
         const w = atDoor();
         w.openAimedDoor();
         const idle = emptyInput();
-        for (let i = 0; i < 40; ++i) w.update(idle);
+        for (let i = 0; i < 40; ++i) {
+            w.update(idle);
+        }
 
         // Stand in the doorway and run well past the maintain duration.
         w.player.position.x = 2.5 * 64;
         w.player.position.y = 2.5 * 64;
-        for (let i = 0; i < 400; ++i) w.update(idle);
+        for (let i = 0; i < 400; ++i) {
+            w.update(idle);
+        }
         expect(w.doors.contexts.length, 'the door retired while occupied').toBe(1);
         expect(w.renderer.getCellPhys(2, 2)).toBe(PHYS_NONE);
     });

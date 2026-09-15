@@ -74,7 +74,9 @@ describe('doors driving the renderer', () => {
         for (let tick = 0; tick < 12; ++tick) {
             applyDoors(dm, rc);
             const frame = renderPortFrame(rc, camera);
-            if (!isClean(compareFrames(previous, frame))) ++changed;
+            if (!isClean(compareFrames(previous, frame))) {
+                ++changed;
+            }
             previous = frame;
         }
         expect(changed).toBeGreaterThanOrEqual(8);

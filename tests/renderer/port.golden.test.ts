@@ -8,7 +8,8 @@ import { Renderer } from '../../src/Renderer.js';
  * Phase 4: the port rendered against the baselines captured from the original.
  *
  * The baselines were taken with the harness compensating for two ordering
- * bugs (see "legacy renderer quirks" in the README), so they already describe
+ * bugs (see "Original-engine behaviour the harness pins" in
+ * documentation/PORT_NOTES.md), so they already describe
  * what a correct renderer produces. The port fixes both internally, which is
  * why it is compared here with no compensation at all.
  */
@@ -118,7 +119,9 @@ describe('ported renderer feature coverage', () => {
         const skyPixels = (f: typeof withSky): number => {
             let n = 0;
             for (let i = 0; i < f.data.length; i += 4) {
-                if (f.data[i + 2] > f.data[i] + 30 && f.data[i + 2] > 80) ++n;
+                if (f.data[i + 2] > f.data[i] + 30 && f.data[i + 2] > 80) {
+                    ++n;
+                }
             }
             return n;
         };
@@ -144,7 +147,9 @@ describe('ported renderer feature coverage', () => {
         const spec = SCENES.find(s => s.name === 'animated')!;
         const rc = buildPortRenderer(spec);
         const direct = renderPortFrame(rc, spec.cameras[1]);
-        for (const camera of spec.cameras) renderPortFrame(rc, camera);
+        for (const camera of spec.cameras) {
+            renderPortFrame(rc, camera);
+        }
         const again = renderPortFrame(rc, spec.cameras[1]);
         expect(isClean(compareFrames(direct, again)), describeDiff(compareFrames(direct, again))).toBe(true);
     }, 30_000);
@@ -211,7 +216,9 @@ describe('flat rasteriser', () => {
             const frame = renderPort(spec, camera);
             let nonOpaque = 0;
             for (let i = 3; i < frame.data.length; i += 4) {
-                if (frame.data[i] !== 255) ++nonOpaque;
+                if (frame.data[i] !== 255) {
+                    ++nonOpaque;
+                }
             }
             expect(nonOpaque, `${spec.name}/${camera.name}: ${nonOpaque} non-opaque pixels`).toBe(0);
         }
@@ -237,7 +244,9 @@ describe('flat rasteriser', () => {
                 // Spread across cell boundaries, including values that land
                 // just under one, which is where the original went wrong.
                 const v = i * 0.37 * ps * 0.05 + (i % 7) * ps - Number.EPSILON * i;
-                if (v < 0) continue;
+                if (v < 0) {
+                    continue;
+                }
                 ++compared;
                 if ((v >> psh) !== ((v / ps) | 0)) {
                     mismatches.push(`cell index, ps=${ps}, v=${v}`);

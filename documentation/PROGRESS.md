@@ -275,32 +275,19 @@ re-recording.
   was measured: with the 1.5 and 1.8 sliding factors swapped, all 23 existing
   door tests pass and the new suite fails 5 — up/down and curtain doors travel
   identically and were told apart by nothing.
-- **Pre-existing lint debt**: 16 `curly` errors, all `--fix`-able, entirely in
-  older test files — `tests/harness/compare.ts` (4),
-  `tests/simulation/doors.test.ts` (4), `tests/renderer/port.golden.test.ts`
-  (4), `tests/demos/simple/world.test.ts` (3),
-  `tests/simulation/doorIntegration.test.ts` (1). None in `src/` or `demos/`.
-  Down from 20; four went with the retired suite.
 - **`dark-village` keeps its MapEdit save but not its tiles.**
   `assets/levels/level-1.json` is back — it is the fidelity fixture for
   `src/mapedit` — but the 2.1 MB of unmerged source tiles it was built from are
   not. So the level can be *converted* (the converter is `src/mapedit` and needs
   nothing external) but not *re-atlased*: editing it means re-importing the
   tiles.
-- **The README's benchmark table describes a comparison that no longer runs.**
-  It reports the port against the original per scene (+3.1% overall), but
-  `npm run bench` now measures the port against its own recorded baseline —
-  the original is gone. The measurements were true when taken and are worth
-  keeping as history; the section needs a line saying so. The port is faster
-  either
-  way.
 
 ## Bugs found so far
 
 Thirteen. Eleven were the original's; one was introduced by this port's
 flat-array optimisation and fixed (`CellMap` bounds); one was a typing bug in
 `Sprite.buildAnimation` that made the directional-sprite form uncompilable.
-The README lists them.
+[PORT_NOTES.md](PORT_NOTES.md) lists them.
 
 Twelve were found by tests rather than by reading. The thirteenth —
 sprites vanishing once the camera had wound past ~1.38 turns, because the

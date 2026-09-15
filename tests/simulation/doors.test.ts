@@ -71,7 +71,9 @@ describe('Easing', () => {
 
     it('every curve but cubeInOut ends at 1', () => {
         for (const [name, f] of Object.entries(EASING_FUNCTIONS)) {
-            if (name === 'cubeInOut') continue;
+            if (name === 'cubeInOut') {
+                continue;
+            }
             expect(f(1), `${name}(1)`).toBeCloseTo(1, 10);
         }
     });
@@ -146,7 +148,9 @@ describe('DoorContext', () => {
         const dc = door({ maintainDuration: 5 });
         let block = true;
         dc.events.on('check', e => {
-            if (block) e.cancel = true;
+            if (block) {
+                e.cancel = true;
+            }
         });
         run(dc, 40);
         expect(dc.isOpen()).toBe(true);
@@ -196,7 +200,9 @@ describe('DoorManager', () => {
         let update = dm.process()[0];
         expect(update).toMatchObject({ x: 3, y: 4, phys: PHYS_DOOR_UP });
 
-        for (let i = 0; i < 20; ++i) update = dm.process()[0];
+        for (let i = 0; i < 20; ++i) {
+            update = dm.process()[0];
+        }
         expect(dc.isOpen()).toBe(true);
         expect(update.phys).toBe(PHYS_NONE);
         expect(update.offset).toBe(96);
@@ -208,7 +214,9 @@ describe('DoorManager', () => {
         let last;
         for (let i = 0; i < 60; ++i) {
             const r = dm.process();
-            if (r.length > 0) last = r[0];
+            if (r.length > 0) {
+                last = r[0];
+            }
         }
         expect(dm.doors.length).toBe(0);
         // The final report restores the cell: shut, and solid again.

@@ -1,422 +1,706 @@
 # raycaster-386
 
-A raycasting engine in TypeScript. Renders like it's 1992; runs like it isn't.
+A raycasting engine for the browser, in TypeScript. Renders like it's 1992;
+runs like it isn't.
 
-A modernised port of the
-[o876-raycaster-engine](https://github.com/Laboralphy/o876-raycaster-engine)
-renderer: strict TypeScript, built with esbuild, no runtime dependencies, and
-verified pixel-for-pixel against the original.
+Textured walls, floors and ceilings, sliding doors and push-wall passages,
+billboard sprites with directional facings, traced light sources, distance fog,
+wall decals and a second storey — plus a simulation layer for doors, actors,
+collisions and triggers that runs just as well on a server with no canvas.
 
-Published as `@laboralphy/raycaster-386`, **ESM only**: load it with `import`,
-or `await import()` from CommonJS. Type declarations are included.
+- **No runtime dependencies.** Strict TypeScript, compiled to ES2022, shipped
+  as ESM with declarations.
+- **The renderer performs no I/O.** You hand it decoded images, and every call
+  on it is synchronous.
+- **Simulation never imports rendering.** World logic runs headless, in a
+  browser, a worker or Node.
+- **Deterministic by construction.** Doors, animations and scheduled commands
+  advance on ticks you supply, and every stateful piece can be saved and
+  restored.
+- **Real level format.** Loads RCE-100 levels, and ships a converter from
+  MapEdit saves.
+
+## Contents
+
+- [Installation](#installation)
+- [Entry points](#entry-points)
+- [Quick start](#quick-start)
+- [Loading a level](#loading-a-level)
+- [The cell map](#the-cell-map)
+- [The game loop](#the-game-loop)
+- [Simulation](#simulation)
+- [Converting MapEdit levels](#converting-mapedit-levels)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Background](#background)
+
+## Installation
 
 ```bash
-npm install
-npm run check      # typecheck + test + build
-npm run demo       # playable demos on http://localhost:8080 (simple, dark-village)
-npm run bench      # port vs the original engine
-npm run build      # dist/index.js + dist/simulation.js
+npm install @laboralphy/raycaster-386
 ```
 
-## Status
+The package is **ESM only**: load it with `import`, or with `await import()`
+from CommonJS. Type declarations are included.
 
-| Phase | Scope | State |
+Rendering needs a Canvas 2D implementation — a browser, or a canvas package
+under Node. The simulation, the schema and the MapEdit converter need nothing.
+
+## Entry points
+
+| Import | Contains | Runs in |
 |---|---|---|
-| 0 | Build scaffold (esbuild, tsconfig, vitest) | done |
-| 1 | Leaf modules | done |
-| 2 | Textures, map, surfaces, lighting, sprites | done |
-| 3 | Golden-image regression harness | done |
-| 4 | Raycasting + renderer | done |
-| 5 | Measured optimisations | done |
-| 6 | Engine layer: doors + easing | done |
-| 7 | Renderer-level demo | done |
-| 8 | RCE-100 level loading | done |
-| 9 | Simulation: doors, collision, movement | in progress |
+| `@laboralphy/raycaster-386` | Core (`CellMap`, `Vector`, geometry, constants) and rendering (`Renderer`, `Sprite`, `MapHelper`, `loadLevel`, `buildObjects`, `SpriteBinding`) | a browser, for rendering |
+| `@laboralphy/raycaster-386/simulation` | `DoorPolicy`, `ActorRegistry`, `Actor`, `moveActor`, `Smasher`, `TagTriggers`, `Scheduler`, `Easing` | anywhere |
+| `@laboralphy/raycaster-386/schema` | The RCE-100 JSON schema, as data | anywhere |
+| `@laboralphy/raycaster-386/mapedit` | `convertMapEditLevel`, and the MapEdit save types | anywhere |
 
-`libs/raycaster` is fully ported, plus the first slice of the simulation tier
-(doors and easing) and a loader for the map editor's saved format. The port
-renders all 34 golden cases; 29 are pixel-identical to the original and 5
-differ deliberately (see below), and it is ~3% faster overall. `npm run demo`
-plays it.
+Code shared between entry points is emitted once, so a `Vector` imported from
+the root is the same class the simulation works with.
 
-The library is built in named tiers: **Core** holds what both sides need,
-**Rendering** turns world state into pixels, **Simulation** advances world
-state by a tick, and **Game** — the caller, not shipped here — owns the loop,
-input and rules. The invariant is the arrow — **Simulation never imports
-Rendering** — which is what keeps a god object like the original's `Engine.js`
-from forming, and what would let the simulation run headless on a server. See
-§12 of the migration doc, and
-[documentation/ENGINE_INVENTORY.md](documentation/ENGINE_INVENTORY.md) for what
-is in scope, what is not, and in what order.
+## Quick start
 
-Where the migration stands, and what to pick up next, is in
-[documentation/PROGRESS.md](documentation/PROGRESS.md). A separate analysis of the
-old level editor, and what replacing it would take, is in
-[documentation/MAPEDIT_ANALYSIS.md](documentation/MAPEDIT_ANALYSIS.md).
+A five-by-five room, drawn from a hand-written map:
 
-Migration progress, decisions and known gaps are recorded in
-[documentation/MIGRATION_FROM_JS.md](documentation/MIGRATION_FROM_JS.md), and
-what remains of the original engine is inventoried feature by feature in
-[documentation/ENGINE_INVENTORY.md](documentation/ENGINE_INVENTORY.md).
+```ts
+import { Canvas, MapHelper, PHYS_NONE, PHYS_WALL, Renderer } from '@laboralphy/raycaster-386';
+import type { LevelMap } from '@laboralphy/raycaster-386';
 
-## Design decisions
+const level: LevelMap = {
+    legend: [
+        // Open floor: floor tile 0 and ceiling tile 1 of the flats atlas.
+        { code: ' ', phys: PHYS_NONE, faces: { f: 0, c: 1 } },
+        // A wall: tile 0 of the walls atlas on all four sides.
+        { code: '#', phys: PHYS_WALL, faces: { n: 0, e: 0, s: 0, w: 0 } },
+    ],
+    map: ['#####', '#   #', '#   #', '#   #', '#####'],
+};
 
-Settled with the original author before the port started.
+// The renderer performs no I/O: decode textures yourself and hand them in.
+const [walls, flats] = await Canvas.loadCanvases(['walls.png', 'flats.png']);
 
-**No reactive options.** The original observed its options object with a
-`Reactor` (`Object.defineProperty` on every scalar) so that a write showed up
-in the next frame. Across the whole upstream repo only three sites ever used
-that, and one of them — `shading.factor` — needs no recompute at all. It cost
-a getter call per option read in the per-column and per-pixel loops.
+const renderer = new Renderer();
+renderer.setScreen({ width: 320, height: 200 });
+renderer.setMetrics({ spacing: 64, height: 96 });
+renderer.setShading({ shades: 16, color: '#000000', filter: null, brightness: 0.1 });
+renderer.setWallTextures(walls);
+renderer.setFlatTextures(flats);
+new MapHelper().build(renderer, level);
 
-Replaced by typed setters that mark a `Dirty` bitmask, revalidated once at the
-top of `render()`. That keeps the one genuinely useful property of the Reactor
-— coalescing several option writes into a single re-shade — and drops ~380
-lines of `Reactor` + `Translator` + `Extender` machinery.
+const screen = document.querySelector('canvas')!;
+const target = screen.getContext('2d')!;
+target.imageSmoothingEnabled = false;
 
-**Validation is a hook, not a dependency.** `Engine.buildLevel` validated
-every level against a 22 kB JSON schema on every load, which costs an npm
-dependency and a walk of a 120 kB document to catch what the map editor could
-have caught on save. `loadLevel` takes an optional `validate` callback
-instead, and the schema ships as data on its own entry point
-(`@laboralphy/raycaster-386/schema`), so a game can check its levels while developing and
-drop both from its release build. What the library always does is stricter and
-free: an unknown `@SYMBOL` throws, where the original's translator passed the
-typo through as a string.
+let angle = 0;
+function draw(): void {
+    angle += 0.01;
+    // Camera in the middle of cell (2, 2), at standing eye height.
+    renderer.render(2.5 * 64, 2.5 * 64, angle, 1);
+    const frame = renderer.renderCanvas;
+    if (frame !== null) {
+        target.drawImage(frame, 0, 0, screen.width, screen.height);
+    }
+    requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+```
 
-**No I/O in the renderer.** Callers pass already-decoded images
-(`setWallTextures(canvas)`). The original loaded texture URLs from inside an
-`async optionsReaction()` that was called without `await` from the render
-path, so texture loading raced with rendering. Removing the I/O removes the
-race structurally rather than patching it, and makes the whole option path and
-`render()` synchronous.
+`walls.png` is a row of tiles `spacing` wide and `height` tall — 64×96 here —
+and `flats.png` a row of 64×64 tiles. Render at a low resolution and let the
+canvas scale it up.
 
-**Dropped**: VR / stereo panels (half-implemented upstream, and its bounds
-check sat in the innermost pixel loop of the flat rasteriser), `ShadedTileSet`
-economy mode (no users), `CellSurface.diffuse` (written once, never read), and
-`screen.focal` as an input (it was overwritten by `adaptFocal()` on every
-resize, so it is now derived and read-only).
+Settings are applied lazily: each setter records what it invalidated and the
+work happens once, at the top of the next `render()`, so changing several in a
+row costs one re-shade.
 
-**Kept**: the second storey, and `paintSurface` wall decals.
+**Coordinates.** World units are texels, and a cell is `spacing` units wide, so
+the centre of cell `(x, y)` is `((x + 0.5) * spacing, (y + 0.5) * spacing)`.
+Angles are in radians: `0` looks along +x, and `-Math.PI / 2` looks towards the
+top of the map as written. The last argument of `render()` is eye height, where
+`1` is standing.
 
-**`SPRITE_Z_SCALE`** (upstream `MAGIC_DIST_RATIO`) is preserved exactly, only
-renamed and documented. Wall shading and slice height both read the unscaled
-wall distance, so normalising the two distance scales would shift the look.
+## Loading a level
 
-## Layout
+Real levels are RCE-100 documents, the format the MapEdit level editor
+publishes. `loadLevel` applies everything the renderer understands — metrics,
+shading, textures, the map, the upper storey, decals and static lights — and
+hands back the rest.
+
+```ts
+import { Canvas, Renderer, buildObjects, loadLevel } from '@laboralphy/raycaster-386';
+import type { RceLevel } from '@laboralphy/raycaster-386';
+
+const renderer = new Renderer();
+// Before loading: the backdrop is scaled to the screen height as it loads.
+renderer.setScreen({ width: 320, height: 200 });
+
+const data = (await (await fetch('levels/level-1.rce.json')).json()) as RceLevel;
+
+// Texture paths in the level are relative to wherever its assets live.
+const loadImage = (src: string) => Canvas.loadCanvas(`levels/${src}`);
+
+const level = await loadLevel(renderer, data, { loadImage });
+
+// Optional: place the level's decorative objects as sprites.
+const objects = await buildObjects(renderer, level, { loadImage });
+
+const spacing = data.level.metrics.spacing;
+const start = level.startpoint ?? { x: 1, y: 1, z: 1, angle: 0 };
+renderer.render((start.x + 0.5) * spacing, (start.y + 0.5) * spacing, start.angle, start.z);
+```
+
+What a renderer cannot act on comes back under `level.unhandled` —
+`blueprints`, `objects`, `tags` and `camera` — so a game can build its own
+entity tier on top without parsing the file again. `buildObjects` turns
+objects into sprites with their animations and lights, and reports each one's
+blueprint and collision size without acting on them.
+
+Symbols such as `"@PHYS_WALL"` are resolved strictly: an unknown one throws
+rather than passing through as a string.
+
+### Validating levels
+
+Validation is a hook rather than a dependency. The schema ships as data on its
+own entry point, so you can check levels while developing and leave both the
+schema and the validator out of a release build.
+
+```ts
+import { Validator } from 'jsonschema';
+import RCE_100_SCHEMA from '@laboralphy/raycaster-386/schema';
+import { Canvas, Renderer, loadLevel } from '@laboralphy/raycaster-386';
+import type { RceLevel } from '@laboralphy/raycaster-386';
+
+const validator = new Validator();
+
+function validate(data: unknown): void {
+    const result = validator.validate(data, RCE_100_SCHEMA as object);
+    if (result.errors.length > 0) {
+        throw new Error(result.errors[0].stack);
+    }
+}
+
+const data = (await (await fetch('levels/level-1.rce.json')).json()) as RceLevel;
+await loadLevel(new Renderer(), data, { loadImage: Canvas.loadCanvas, validate });
+```
+
+`validate` runs before anything is loaded, so a rejected level leaves the
+renderer untouched. The schema is the editor's, unmodified: it requires the
+`blueprints`, `objects` and `camera` sections, even though this library only
+reports them.
+
+## The cell map
+
+A level's grid lives in a `CellMap`: one packed 32-bit integer per cell, read
+by the renderer and the simulation alike.
+
+### Dimensions
+
+The map is always square, and `size` is its width and height in cells:
+
+```ts
+import { Renderer } from '@laboralphy/raycaster-386';
+
+const renderer = new Renderer();
+renderer.setMapSize(32);
+
+console.log(renderer.getMapSize()); // 32 cells per side
+console.log(renderer.cellMap.size); // 32, read from the map itself
+console.log(renderer.cellMap.isInside(31, 31)); // true
+console.log(renderer.cellMap.isInside(32, 0)); // false: cells run from 0 to size - 1
+
+// In world units (texels), the map is size × spacing wide.
+const worldWidth = renderer.getMapSize() * renderer.metrics.spacing;
+```
+
+`MapHelper` and `loadLevel` size the map from the level's grid, so read the
+size after loading rather than assuming one. `CellMap.setSize()` resizes and
+keeps the cells that still fit; `renderer.setMapSize()` also resizes the
+renderer's surface and light buffers, and its upper storey — whose own map,
+`renderer.storey?.cellMap`, is always the same size as the ground floor's.
+
+A world position converts to a cell, and back to that cell's centre, with the
+cell size from the level's metrics:
+
+```ts
+import { cellCenter, worldToCell } from '@laboralphy/raycaster-386';
+
+console.log(worldToCell(200, 90, 64)); // { x: 3, y: 1 }
+console.log(cellCenter(3, 1, 64)); // { x: 224, y: 96 }
+```
+
+`worldToCell` does not clamp: check the result with `isInside()` before using a
+position that may be off the map.
+
+### Structure of a cell
+
+Each cell packs three fields into one unsigned 32-bit integer:
+
+```
+  bits 31..24   unused
+  bits 23..16   offset     0..255    how far a door has slid, or a block is set back
+  bits 15..12   phys       0..15     a PHYS_* code: how the cell behaves
+  bits 11..0    material   0..4095   which registered material draws its faces
+```
+
+**`material`** is the code a material was registered under with
+`renderer.registerCellMaterial(code, faces)`, which gives the cell's four walls,
+floor and ceiling their tiles. `MapHelper` and `loadLevel` register each legend
+entry under its index, so `level.materials[i]` describes material `i`.
+
+**`phys`** decides what the cell does to movement, rays and light:
+
+| Code | Value | Blocks movement | Rendering |
+|---|---|---|---|
+| `PHYS_NONE` | 0 | no | empty: rays pass through |
+| `PHYS_WALL` | 1 | yes | an opaque wall |
+| `PHYS_DOOR_UP`, `PHYS_DOOR_DOWN` | 2, 4 | yes | a door sliding up or down; rays see past it once it has moved |
+| `PHYS_CURT_UP`, `PHYS_CURT_DOWN` | 3, 5 | yes | a curtain rising or falling, likewise |
+| `PHYS_DOOR_LEFT`, `PHYS_DOOR_RIGHT` | 6, 7 | yes | a door sliding sideways, likewise |
+| `PHYS_DOOR_DOUBLE` | 8 | yes | a double door parting in the middle, likewise |
+| `PHYS_SECRET_BLOCK` | 9 | yes | a wall set back by `offset`: a push-wall passage |
+| `PHYS_TRANSPARENT_BLOCK` | 10 | yes | drawn, and rays continue behind it: bars, windows |
+| `PHYS_INVISIBLE_BLOCK` | 11 | yes | not drawn at all |
+| `PHYS_OFFSET_BLOCK` | 12 | yes | a wall set back by `offset` |
+
+A door stops blocking movement because `DoorPolicy` writes `PHYS_NONE` into its
+cell while it stands open, and the shut code back when it closes. Light passes
+through `PHYS_NONE`, transparent and invisible blocks; every other code blocks
+it.
+
+**`offset`** is 0 for most cells. For a door it is how far the door has slid,
+in texels, as reported each tick by `doors.process()`; for an offset or secret
+block, how far the wall is set back.
+
+### Reading and writing cells
+
+```ts
+import { CellMap, PHYS_DOOR_UP, PHYS_WALL, materialOf, offsetOf, physOf } from '@laboralphy/raycaster-386';
+
+const map = new CellMap();
+map.setSize(16);
+
+map.setMaterial(3, 4, 2);
+map.setPhys(3, 4, PHYS_DOOR_UP);
+map.setOffset(3, 4, 32);
+
+const code = map.get(3, 4); // all three fields in one number
+console.log(materialOf(code), physOf(code), offsetOf(code)); // 2 2 32
+
+console.log(map.getPhys(-1, 0) === PHYS_WALL); // true: outside the map reads as a wall
+map.set(99, 99, 0); // ignored: writes outside the map are dropped
+```
+
+Every accessor is bounds-checked. Code that needs raw speed can read
+`map.data`, a `Uint32Array` stored row-major — cell `(x, y)` is at index
+`y * size + x` — and unpack it with the exported `CELL_MATERIAL_MASK`,
+`CELL_PHYS_SHIFT`, `CELL_PHYS_MASK`, `CELL_OFFSET_SHIFT` and `CELL_OFFSET_MASK`.
+
+**With a renderer, write through the renderer.** `renderer.cellMap` is a
+read-only view, because a phys change must also re-trace the lights around the
+cell: use `renderer.setCellMaterial()`, `setCellPhys()` and `setCellOffset()`,
+and their `getCell…()` counterparts. Without a renderer, the `CellMap` is yours
+to write to directly, as in [Running headless](#running-headless).
+
+## The game loop
+
+The library draws and it simulates; **your game owns the loop**. A tick
+advances the simulation, and two pieces of plain data cross from the
+simulation to the renderer: door cell updates, and an `ActorFrame` of what
+moved.
+
+```ts
+import { Renderer, SpriteBinding, Vector } from '@laboralphy/raycaster-386';
+import { ActorRegistry, DoorPolicy, moveActor } from '@laboralphy/raycaster-386/simulation';
+import type { MotionContext, Thinker } from '@laboralphy/raycaster-386/simulation';
+
+const TICK_MS = 1000 / 60;
+const spacing = 64;
+
+const renderer = new Renderer();
+// ...screen, metrics, textures and map, as in the quick start.
+
+const actors = new ActorRegistry<MotionContext>();
+// One sector per cell, so "who is standing here" is a lookup.
+actors.setSectors(renderer.getMapSize(), spacing);
+
+const doors = new DoorPolicy({
+    map: renderer.cellMap,
+    metrics: renderer.metrics,
+    // A door never closes on anyone standing in it.
+    isCellOccupied: (x, y) => actors.actorsAt(x, y).length > 0,
+});
+
+// Behaviour lives in thinkers. Fill `keys` from your input handling.
+const keys = { forward: 0, turn: 0 };
+const walker: Thinker<MotionContext> = {
+    think(actor, context) {
+        const p = actor.position;
+        p.angle += keys.turn * 0.05;
+        const step = new Vector(Math.cos(p.angle), Math.sin(p.angle)).scale(keys.forward * 3);
+        moveActor(actor, context, step); // slides along walls
+    },
+};
+
+const player = actors.spawn({ x: 2.5 * spacing, y: 2.5 * spacing, size: 12 });
+player.thinker = walker;
+
+const binding = new SpriteBinding(renderer);
+
+function tick(): void {
+    // 1. Behaviour: every actor's thinker runs.
+    const frame = actors.process({ map: renderer.cellMap, spacing });
+
+    // 2. Doors: apply each cell update to the renderer.
+    for (const { x, y, offset, phys } of doors.process()) {
+        renderer.setCellOffset(x, y, offset | 0);
+        renderer.setCellPhys(x, y, phys);
+    }
+
+    // 3. Actors: move every bound sprite, its light and its facing.
+    binding.apply(frame, player.position);
+
+    // 4. Texture and sprite animations run on the simulation's clock.
+    renderer.computeAnimations(TICK_MS);
+}
+
+let previous = performance.now();
+let carry = 0;
+function loop(now: number): void {
+    // A fixed step, so door timing does not depend on the frame rate.
+    carry += Math.min(now - previous, 250);
+    previous = now;
+    while (carry >= TICK_MS) {
+        tick();
+        carry -= TICK_MS;
+    }
+    const p = player.position;
+    renderer.render(p.x, p.y, p.angle, 1);
+    // ...copy renderer.renderCanvas to the screen, as in the quick start.
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+```
+
+The renderer knows which cell is under the crosshair, which is the usual way to
+open a door:
+
+```ts
+import type { Renderer } from '@laboralphy/raycaster-386';
+import type { DoorPolicy } from '@laboralphy/raycaster-386/simulation';
+
+function use(renderer: Renderer, doors: DoorPolicy): void {
+    const aimed = renderer.aimedCell;
+    if (aimed !== null && doors.isDoor(aimed.xCell, aimed.yCell)) {
+        doors.openDoor(aimed.xCell, aimed.yCell, true); // true: closes again by itself
+    }
+}
+```
+
+### Sprites
+
+A sprite draws from a tileset, and is tied to an actor by its id. Bind it once;
+`binding.apply()` does the rest every tick, and disposes the sprite and its
+light when the actor is removed.
+
+```ts
+import { ANIM_LOOP_FORWARD, Canvas, Renderer, SpriteBinding } from '@laboralphy/raycaster-386';
+import { ActorRegistry } from '@laboralphy/raycaster-386/simulation';
+
+const renderer = new Renderer();
+const binding = new SpriteBinding(renderer);
+const actors = new ActorRegistry();
+
+const guard = actors.spawn({ x: 320, y: 160, size: 10, ref: 'guard' });
+
+const tileset = renderer.buildTileSet(await Canvas.loadCanvas('guard.png'), 64, 96);
+const sprite = renderer.buildSprite(tileset);
+// Four frames per facing, eight facings laid end to end: starts at 0, 4, 8...
+sprite.buildAnimation(
+    {
+        starts: Array.from({ length: 8 }, (_, facing) => facing * 4),
+        length: 4,
+        duration: 150,
+        loop: ANIM_LOOP_FORWARD,
+    },
+    'walk'
+);
+sprite.setCurrentAnimation('walk');
+
+const light = renderer.addLightSource(guard.position.x, guard.position.y, 24, 110, 0.6);
+binding.bind(guard.id, sprite, { light });
+```
+
+`starts` holds one first tile per facing; a single entry is a sprite that looks
+the same from every side. The binding picks the facing from the actor's angle
+and the camera's position. Animation `duration` is in the unit you pass to
+`computeAnimations` — milliseconds in the loop above.
+
+## Simulation
+
+Everything here comes from `@laboralphy/raycaster-386/simulation`, holds no
+reference to a renderer, and advances only when you call it.
+
+### Doors
+
+`DoorPolicy` reads a cell's phys code to know what is a door and how it moves:
+`PHYS_DOOR_UP`, `PHYS_DOOR_DOWN`, `PHYS_DOOR_LEFT`, `PHYS_DOOR_RIGHT` and
+`PHYS_DOOR_DOUBLE` slide, `PHYS_CURT_UP` and `PHYS_CURT_DOWN` are curtains, and
+`PHYS_SECRET_BLOCK` is a push-wall passage: the block recesses and shoves the
+one behind it back.
+
+- `openDoor(x, y, autoclose)`, `closeDoor(x, y)` and `lockDoor(x, y, locked)`
+  drive them. A closing door that finds something in the way waits and retries.
+- `doors.events` emits `opened`, `closing`, `closed` and `locked`.
+- `slidingDuration` and `maintainDuration` set timings, in ticks.
+  `openFunction` and `closeFunction` take an easing name or function.
+- `doorShape(code, phys)` gives one kind of door its own travel, speed or
+  easing — a heavy stone slab next to a light wooden door.
+
+### Actors and thinkers
+
+An `Actor` is a position, a size, a collision body and a `thinker`. It holds no
+sprite and no light, which is what lets it exist on a server. `ActorRegistry`:
+
+- `spawn(init)` creates one; `ref` and `data` are yours to use.
+- `process(context)` runs every thinker, then returns an `ActorFrame`: the
+  actors that moved, and the ids removed. Setting `actor.dead = true` removes
+  an actor on the next tick.
+- A `Thinker` has `think(actor, context)`, plus optional `attach` and `detach`.
+  The context type is whatever your game passes to `process()`.
+
+### Collision
+
+- **Against walls:** `moveActor(actor, context, v)` slides an actor along
+  whatever is solid and returns how far it really went. Pass `crashWall` to stop
+  dead instead, as a projectile would. `computeWallCollisions` is the primitive
+  underneath.
+- **Between actors:** `Smasher` compares circles over a sector grid and adds a
+  separating force to each overlapping actor's `dummy.force`. It moves nothing:
+  applying the force is your decision.
+
+### Tags and triggers
+
+A tag is a command string attached to cells — `teleport 12 3`, or
+`sound "door open"` — which is how the editor stores triggers. `TagTriggers`
+turns movement across tagged cells into events:
+
+```ts
+import { ActorRegistry, TagTriggers } from '@laboralphy/raycaster-386/simulation';
+
+const actors = new ActorRegistry();
+const tags = new TagTriggers();
+tags.setMapSize(32, 64); // map size in cells, cell size in world units
+tags.grid.addTag(4, 7, 'teleport 12 3');
+
+tags.events.on('enter', (event) => {
+    if (event.command === 'teleport') {
+        const [x, y] = event.parameters.map(Number);
+        console.log(`actor ${event.actor} wants to go to ${x}, ${y}`);
+        event.remove(); // a one-shot trigger retires its whole region
+    }
+});
+
+// Every tick, after the registry:
+tags.process(actors.process(undefined));
+```
+
+`enter` and `leave` fire as actors cross cells; `tags.push(actorId, x, y)` fires
+`push` for a solid cell someone tried to use. Loaded levels report their tags
+under `level.unhandled.tags`.
+
+### Scheduling and easing
+
+`Scheduler` runs commands on the simulation's clock rather than the wall
+clock's, so a paused or replayed game stays in step:
+
+```ts
+import { Easing, Scheduler } from '@laboralphy/raycaster-386/simulation';
+
+const scheduler = new Scheduler();
+scheduler.delay(() => console.log('two seconds of ticks later'), 120);
+const heartbeat = scheduler.loop(() => console.log('beat'), 60);
+scheduler.cancel(heartbeat);
+
+let tick = 0;
+scheduler.schedule(++tick); // call once per tick
+
+const fade = new Easing({ from: 0, to: 1, steps: 30, use: 'smoothstep' });
+while (!fade.over()) {
+    fade.compute();
+    console.log(fade.y);
+}
+```
+
+### Save and restore
+
+Actors, doors and tags expose their state as plain, JSON-safe data:
+
+```ts
+import type { ActorRegistry, DoorPolicy, TagTriggers } from '@laboralphy/raycaster-386/simulation';
+
+function save(actors: ActorRegistry, doors: DoorPolicy, tags: TagTriggers): string {
+    return JSON.stringify({ actors: actors.state, doors: doors.state, tags: tags.grid.state });
+}
+
+function restore(json: string, actors: ActorRegistry, doors: DoorPolicy, tags: TagTriggers): void {
+    const saved = JSON.parse(json);
+    actors.setState(saved.actors);
+    doors.setState(saved.doors);
+    tags.grid.state = saved.tags;
+}
+```
+
+Behaviour is code, not data, so thinkers are not saved: reattach them after a
+restore, using each actor's `ref` to tell which is which.
+
+### Running headless
+
+The simulation only needs a `CellMap`. Without a renderer, you own the map and
+apply the door updates to it directly:
+
+```ts
+import { CellMap, PHYS_DOOR_UP, PHYS_WALL } from '@laboralphy/raycaster-386';
+import { DoorPolicy } from '@laboralphy/raycaster-386/simulation';
+
+const map = new CellMap();
+map.setSize(16);
+for (let i = 0; i < 16; ++i) {
+    map.setPhys(i, 0, PHYS_WALL);
+}
+map.setPhys(5, 5, PHYS_DOOR_UP);
+
+const doors = new DoorPolicy({ map, metrics: { spacing: 64, height: 96 } });
+doors.openDoor(5, 5, false);
+
+for (let tick = 0; tick < 60; ++tick) {
+    for (const { x, y, phys, offset } of doors.process()) {
+        map.setPhys(x, y, phys);
+        map.setOffset(x, y, offset | 0);
+    }
+}
+
+console.log(doors.isDoorOpen(5, 5)); // true
+```
+
+Importing the root entry point under Node is safe: only rendering calls need a
+canvas.
+
+## Converting MapEdit levels
+
+MapEdit saves its own format — unmerged tiles, room for undo — and RCE-100 is
+the build artifact made from it. `convertMapEditLevel` does that compilation
+anywhere, but leaves the one host-specific step to you: combining tiles into a
+sheet.
+
+```ts
+import { convertMapEditLevel } from '@laboralphy/raycaster-386/mapedit';
+import type { ImageAppender, MapEditLevel } from '@laboralphy/raycaster-386/mapedit';
+
+const append: ImageAppender = async (tiles, start, count) => {
+    // Lay `count` tiles out left to right, starting at `start`, and store the sheet.
+    const sheet = await drawSheet(tiles.slice(start, start + count));
+    // Report the size of ONE frame, not of the whole sheet.
+    return { src: sheet.url, width: sheet.frameWidth, height: sheet.frameHeight };
+};
+
+const save = (await (await fetch('level-1.json')).json()) as MapEditLevel;
+const rce = await convertMapEditLevel(save, append);
+```
+
+An unrecognised save version is refused rather than converted on a guess.
+[`scripts/convert-mapedit-level.mjs`](scripts/convert-mapedit-level.mjs) is a
+complete Node implementation over `@napi-rs/canvas`.
+
+## Architecture
+
+The library is built in tiers, and one rule holds them apart.
+
+| Tier | Owns | Never |
+|---|---|---|
+| **Core** | The cell map, vectors, grids, geometry, the `ActorFrame` contract | Touches the DOM |
+| **Rendering** | Turning world state into pixels | Advances time, performs I/O |
+| **Simulation** | Advancing world state by a tick | Imports rendering, touches the DOM, owns a loop |
+| **Game** — yours | The loop, input, rules, and moving data between the two | — |
+
+**Simulation never imports rendering.** Doors report cell updates and actors
+report frames, as plain data; the game applies them. That keeps the renderer a
+pure function of world state, and lets the whole simulation run headless. The
+build enforces it: `src/simulation` is type-checked without the DOM library.
+
+### Source layout
 
 ```
 src/
-  consts.ts               face / phys / fx codes, as const unions rather than enums
-  core/                   Core: shared by rendering and simulation, no DOM
-    CellMap.ts            flat Uint32Array of packed cell codes; read by both tiers
-    cells.ts              world/cell conversion, cell centres, block swaps
-    Vector.ts             2D vector; immutable add/sub, mutable translate/scale
-    Rainbow.ts            CSS colour parsing, dependency-free so shading is testable under Node
-    MarkerRegistry.ts     set of marked 2D positions
-    Grid.ts               dense 2D grid (replaces @laboralphy/grid)
-    bresenham.ts          line walk with early abort
-    geometry.ts           distance, circleInRect, linear
-    canvas.ts             canvas creation, pixel filter, image loading (Rendering only)
-  map/
-    CellSurfaceManager.ts per-face decals and light strips
-    MapHelper.ts          builds a renderer from a saved level (legend + grid)
-  texture/
-    ShadedTileSet.ts      pre-computed distance shading, layers stacked vertically
-    TileAnimation.ts
-  light/
-    LightMap.ts           traced static lighting
-    LightSource.ts
-  Sprite.ts
-  DebugDisplay.ts
-  level/                  RCE-100 loading; an importer onto LevelMap, not a second native shape
-    types.ts              the saved format, as written by the map editor
-    constants.ts          "@PHYS_WALL" and friends, resolved strictly
-    loadLevel.ts          builds a renderer; reports what it does not handle
-    buildObjects.ts       turns a level's objects into placed sprites
-    rce-100.json          the format schema, shipped unmodified on its own entry point
-  simulation/             world state advanced by a tick; separate bundle
-    DoorPolicy.ts         which cells are doors, and opening, closing, locking them
-    neighbors.ts          the cells around a cell, bounded by the map
-    wallCollider.ts       slides a mobile along walls instead of sticking
-    Smasher.ts            actor-vs-actor collision over a coarse sector grid
-    Dummy.ts              one actor's collision body: circle, masks, force field
-    ForceField.ts         the forces pushing on one actor this tick
-    SectorRegistry.ts     buckets actors so only near neighbours are compared
-    Easing.ts
-    DoorContext.ts        one door's state machine
-    DoorManager.ts        ticks every door, reports cell updates
-    TypedEmitter.ts
+  consts.ts       phys, face, animation and effect codes
+  core/           CellMap, Vector, Grid, MarkerRegistry, geometry, flood fill, canvas helpers
+  raycast/        ray casting and the z-buffer
+  render/         flats, wall slices, sprites, sprite facing, SpriteBinding
+  texture/        distance-shaded tilesets, tile animations
+  light/          traced light map and light sources
+  map/            per-face surfaces and decals, MapHelper
+  level/          RCE-100 types, loadLevel, buildObjects, the schema
+  simulation/     doors, actors, collision, tags, scheduler, easing
+  mapedit/        the MapEdit to RCE-100 converter
+  Renderer.ts     the renderer
+  Sprite.ts       billboards
 ```
 
-`src/simulation/` never imports the renderer. See §7 of the migration doc for why.
-
-### Cell encoding
-
-Each cell of `CellMap` packs three fields into one 32-bit int:
-
-```
-  bits 23..16   offset   (0..255)  door slide / block recess
-  bits 15..12   phys     (0..15)   PhysCode
-  bits 11..0    material (0..4095) index into the cell code table
-```
-
-Stored flat and row-major rather than as an array of arrays: `projectRay` reads
-one cell per DDA step and `renderFlats` walks the map essentially at random, so
-one indexed load beats two dependent ones.
-
-## Testing
+## Development
 
 ```bash
-npm test
+npm install
+npm run check         # typecheck, lint, format, test and build: run before committing
+npm test              # tests only
+npm run demo          # the demos on http://localhost:8080 (simple, dark-village)
+npm run bench         # renderer cost against tests/bench/baseline.json
+npm run build         # bundles into dist/
+npm run types         # declarations into dist/, after build
+
+# Converts a demo's MapEdit save to RCE-100.
+node scripts/convert-mapedit-level.mjs demos/dark-village
 ```
 
-Everything runs on a fresh clone — no external checkout, no optional
-dependency. That was not always true: until 2026-09-11 a `tests/differential/`
-suite bundled modules out of the original `o876-raycaster-engine` and compared
-them bit for bit, and skipped silently when that tree was absent. The migration
-it existed for is finished, so it was retired.
-
-What it leaves behind is `tests/golden/` — 45 baseline images captured from the
-original while it was still there, enforced by `tests/renderer/port.golden.test.ts`.
-`tests/golden/README.md` explains where each came from and why seven of them
-deliberately differ from the original's output.
+The demos are small complete games: `demos/simple` builds its map in code,
+`demos/dark-village` loads a real 59×59 level with an upper storey, a secret
+passage and tagged cells.
 
 ### Golden images
 
-`tests/golden/` holds one committed PNG per (scene, camera) pair, captured
-from the original engine running headless via `@napi-rs/canvas`. Phase 4
-renders the same cases through the port and compares against them.
+Rendering is verified against 45 committed baseline images in `tests/golden/`,
+one per scene and camera pose, compared with a tolerance of zero. A mismatch
+writes the actual image, the expected one and a diff to `.golden-out/`, with
+the differing pixel count and bounding box.
 
 ```bash
-npm test                       # compare against the committed baselines
-UPDATE_GOLDEN=1 npm test       # recapture them
+UPDATE_GOLDEN=1 npm test     # re-record the baselines from the current renderer
+UPDATE_BENCH=1 npm run bench # re-record the benchmark baseline
 ```
 
-A mismatch writes `actual`, `expected` and a red-on-grey `diff` image to
-`.golden-out/`, and reports the differing pixel count, the largest channel
-delta and a bounding box. Comparison is exact — tolerance defaults to 0,
-because a faithful transcription should be exact and a nonzero default would
-hide small regressions.
+Re-recording blesses whatever the renderer draws now, bugs included: read the
+diffs in `.golden-out/` first. [`tests/golden/README.md`](tests/golden/README.md)
+records where the baselines came from, and why seven of them deliberately
+differ from the original engine's output.
 
-Scenes live in `tests/harness/scenes.ts` and cover four-wall rooms, both
-camera-height branches of the flat rasteriser, sliding and lateral doors,
-transparent and invisible blocks, traced light sources, a colour filter over
-non-black fog, sprites at a range of distances and effect flags, painted wall
-and flat decals, and a second storey. Texture atlases are generated per-texel from a formula
-rather than drawn, so they are backend-independent and any sampling shift
-changes a value.
+The fidelity test for the MapEdit converter skips when its fixture is missing.
+`RAYCASTER_REQUIRE_FIXTURES=1` turns that into a failure, as CI does.
 
-The harness is self-checked: it proves the comparator detects a one-degree
-rotation, a half-pixel translation and a single flipped bit; that the PNG
-store round-trips losslessly; and that renders are deterministic across
-instances and across repeated frames. It was validated end to end by
-injecting a one-character off-by-one into the original's `projectRay`, which
-it caught as a 26% pixel difference with a bounding box.
+## Background
 
-### A bug this port introduced, and fixed
+raycaster-386 is a TypeScript port of the renderer and engine of
+[o876-raycaster-engine](https://github.com/Laboralphy/o876-raycaster-engine),
+checked pixel for pixel against the original until the port replaced it.
+The history is kept in `documentation/`:
 
-`CellMap` packs the map into a flat `Uint32Array` indexed `y * size + x`,
-because `projectRay` reads one cell per DDA step and one indexed load beats two
-dependent ones. The original stored an array of arrays, where `this._map[y][x]`
-with an out-of-range `y` threw a TypeError — loud and immediate.
+- [PORT_NOTES.md](documentation/PORT_NOTES.md) — design decisions, the bugs
+  fixed along the way, and performance against the original
+- [MIGRATION_FROM_JS.md](documentation/MIGRATION_FROM_JS.md) — the migration
+  log, subsystem by subsystem
+- [ENGINE_INVENTORY.md](documentation/ENGINE_INVENTORY.md) — everything the
+  original engine did, sorted by tier
+- [PROGRESS.md](documentation/PROGRESS.md) — where the work stands
+- [MAPEDIT_ANALYSIS.md](documentation/MAPEDIT_ANALYSIS.md) — what replacing the
+  level editor would take
 
-Flattening turned that into a silent fault. Reads off the map returned phys 0,
-which means *walkable*; and because `(-1, 1)` computes to a valid index in the
-row above, `setOffset(-1, 1, v)` really wrote — to the wrong cell, touching only
-the offset bits, so nothing looked broken. Every accessor is now bounds-checked:
-outside the map reads as solid, and writes there are dropped rather than
-wrapped. The hot loops read the backing store directly and never went through
-the accessors, so the check is free where it would have mattered — measured
-across repeated benchmark runs, the difference is below the noise floor.
+## License
 
-### Bugs fixed in the port
-
-Three, all found by the harness rather than by reading:
-
-- **`render()` now clears the frame.** The original painted background, flats
-  and slices without clearing, so any pixel none of them covered kept the
-  previous frame. A half-open door leaves exactly such a gap.
-- **The light map is traced before the scene is cast.** The original called
-  `updateStaticLightMap()` between building the z-buffer and drawing the
-  flats, so the first frame after a light changed shaded its walls against a
-  stale map while its floor already used the new one.
-- **A storey inherits its parent's settings.** `createStorey()` copied
-  nothing and the shading transmit in `optionsReaction` was commented out, so
-  the original's upper floor shaded with the default 16 layers while sharing a
-  tileset the ground floor had built with 8 — indexing past the end of the
-  atlas. This is why `storey--centre` and `storey--centre-diag` are two of the
-  baselines that deliberately differ; `tests/golden/README.md` lists all seven
-  with their reasons.
-
-Two more surfaced later:
-
-- **A flat texel could be sampled one row past the atlas.** The original
-  computed a source row as `((fy % ps) + layer * ps) | 0`. Where `fy % ps`
-  landed just under the cell size — 255.99999999999997 — adding the layer
-  offset rounded the deficit away to exactly 512, one row too far, and the
-  out-of-bounds read wrote a transparent pixel. The port truncates before
-  adding. This is the `room--crouched` baseline difference.
-- **`MapHelper` silently dropped block lights.** `buildMaterialItem` did not
-  copy `light` onto the material it built, so the branch that creates a light
-  per cell could never fire and `blockLights` always came back empty.
-- **Exactly coincident actors produced a `NaN` collision force.** The original
-  normalised a zero-length vector to get a separating direction, summed the
-  resulting `(NaN, NaN)` onto the actor's force, and then discarded it — so a
-  caller that added that force to a position corrupted the position permanently,
-  with nothing left to show where it came from. The port separates coincident
-  actors along a fixed axis, and `Vector.normalize()` returns zero rather than
-  `NaN`.
-- **A repeating scheduled command with a zero interval hung the loop.**
-  `Scheduler` advanced a repeat with `while (due <= now) due += duration`, which
-  never terminates when the duration is zero. The port rejects a non-positive
-  interval outright.
-- **Flood fill reported cells twice.** A cell was marked only once popped, so
-  several neighbours could push it first — and the starting cell was pushed
-  twice outright, guaranteeing a duplicate in every result. Marking on push
-  fixes both and halves the work on any region wider than a corridor.
-- **Sprites vanished once the camera had turned enough.** A sprite's bearing
-  was reduced into (-PI, PI] by adding or subtracting `2 * PI` exactly once,
-  but a camera angle is accumulated and never wrapped — both this port's
-  `PlayerThinker` and the original's `FPSControlThinker` just do `angle +=`.
-  One correction cannot close a gap several revolutions wide, so past ~1.38 net
-  turns sprites started failing the off-axis test and disappearing; past ~1.62
-  every sprite was gone. Between the two lay a narrow band where *some* went
-  and the rest stayed, which is what made it look like one bad sprite rather
-  than a broken renderer. The walls never showed it: they are cast with
-  periodic `cos`/`sin`, which do not care what the angle winds to. The port
-  reduces with a modulo. Found by playing `demos/dark-village`, not by a
-  test — the first one that was.
-- **`quoteSplit` returned its input when nothing matched.** An empty tag came
-  back as `''` rather than `[]`, so a caller taking the command off the front
-  got a character instead of a word.
-- **Every actor's light and sector were rewritten every frame.** `Horde` decided
-  whether an actor had moved by comparing `sprite.z` against the entity's `z`,
-  and `Sprite` has no `z` — so the answer was always "moved". The port compares
-  an actor against its own last reported position, which also works with
-  nothing drawing.
-- **A directional sprite with fewer than eight facings crashed.** The facing was
-  masked with `& 7`, which can index past a shorter group; the sprite then read
-  `.index` off `undefined`. Facings are now quantised onto the count the sprite
-  actually declares.
-- **`Sprite.buildAnimation` could not be given the array form it documents.**
-  Its parameter type intersected `TileAnimationDef` with `{ start?: number |
-  number[] }`, and intersecting object types intersects their members, so
-  `start` collapsed back to `number`. The array of starts is how a directional
-  sprite is declared, so the whole facing mechanism was unreachable from
-  TypeScript while the runtime supported it.
-- **`isDoorOpen` always threw.** `Engine.isDoorOpen` called
-  `oDoor.isDoorOpen(x, y)`, which `DoorContext` does not define, so every cell
-  that had a door context raised a TypeError. Dead code upstream, since nothing
-  reachable called it; ported as `dc.isOpen()`.
-- **An ordinary door beside an open secret passage adopted it.** The lookup for
-  a secret passage's other half accepted any adjacent secret context without
-  first asking whether the door itself was part of a passage. So a door next to
-  a live secret block reported its `closing` event from that block — which never
-  autocloses, so the event never arrived — and closing the door shut the passage
-  instead. The lookup now returns nothing unless the subject is itself secret.
-- **A secret passage could pair with a block on the far edge of the map.** The
-  neighbour walk read `getCellPhys(-1, y)`, and `CellMap` indexes a flat array
-  with no bounds check, so that is the last cell of the row above. The port's
-  `forEachNeighbor` skips cells outside the map.
-- **A secret passage restored from the wrong end ran backwards.** Saved door
-  state recorded nothing distinguishing the block that pushes from the block
-  that is pushed, so reloading rebuilt the passage with the roles swapped. The
-  state entry now carries the leading half's child cell.
-- **A restored door forgot how far it had slid.** `DoorContext.setState`
-  computed the easing at the restored time and discarded the result, never
-  assigning `_offset`. A save reloaded with a half-open door reported offset 0
-  until the next tick, so the door drew shut for a frame. Found by writing the
-  round-trip test that `DoorManager.setState` needed.
-
-And two dead-code bugs fixed in passing: `getMemoryUsage()` called a method
-that does not exist and so always threw, and `optimizeBuffer` pushed the same
-slice three times when given fewer than three.
-
-### Performance
-
-The port is **~3% faster overall** than the original, and its rasteriser — 90%
-of a frame — is **~15% faster**. The table below is the measurement that
-established that, taken while both engines could still be run side by side.
-
-It is history now: the original was retired on 2026-09-11, and `npm run bench`
-measures the port against its own recorded baseline in
-`tests/bench/baseline.json` instead, reporting each scene's cost as a multiple
-of `room` so the comparison survives moving between machines.
-
-```
-  room        original 1.293  port 1.215  +6.0%
-  doors       original 1.632  port 1.576  +3.4%
-  lit         original 1.271  port 1.202  +5.4%
-  tinted      original 1.226  port 1.161  +5.2%
-  sprites     original 1.231  port 1.196  +2.8%
-  decals      original 1.227  port 1.209  +1.5%
-  odd-spacing original 1.336  port 1.374  -2.9%
-  TOTAL       original 9.215  port 8.933  +3.1%
-```
-
-`odd-spacing` uses a cell size of 48 and so takes the generic arithmetic path;
-it is the one case the port does not win, and it exists to keep that path from
-becoming dead code. `storey` is excluded because the two are not doing the
-same work — the original's upper floor is mis-shaded and draws less.
-
-Getting there took profiling rather than reasoning. The first working port was
-**55% slower**. What actually mattered, in order:
-
-- **Shifts instead of divisions in `renderFlats`.** A power-of-two cell size
-  turns six divisions and moduli per pixel into shifts and masks — worth about
-  7% of a whole frame. The loop is written out twice rather than branching per
-  pixel: a branch there measured *worse* than the division it avoids, because
-  it stops V8 keeping the values in registers across the loop body.
-- **Per-cell lookups hoisted out of the per-pixel loop.** Cell surfaces, the
-  material code and the light level change every ~64 pixels, not every pixel.
-- **Flat tile indices resolved once per frame** into an `Int32Array`, instead
-  of walking the cell-code table twice per pixel.
-- **`castRay` skips `Set.clear()`** when the exclusion registry is already
-  empty, which it almost always is — 7% of `computeScene` on its own.
-
-An earlier estimate in this project's planning said the port would land
-10-25% faster for a different reason: that hoisting option reads out of the
-hot loops would win. That reasoning was wrong. `renderFlats` had already
-hoisted everything into locals in the original, so there was nothing to gain
-there — and it is the function that dominates.
-
-### Original-engine behaviour the harness pins
-
-Three quirks found while building the baseline. Phase 4 must decide about
-each; all are pinned as tests in `renderer.golden.test.ts`.
-
-- **`render()` never clears the canvas.** It paints the background,
-  overwrites the flat area, then draws wall slices; any pixel none of those
-  covers keeps the previous frame. A half-open door leaves exactly such a
-  gap, so a frame can depend on the frame before it. The harness resets to
-  opaque black before each capture.
-- **The first frame shades walls against a stale light map.**
-  `updateStaticLightMap()` runs *after* `computeScene()`, so frame 1 builds
-  its zbuffer before any light is traced while its flats already use the
-  fresh map. It settles after exactly one frame, which is why captures
-  discard one warm-up frame.
-- **One ceiling pixel is skipped at screen centre when camera height is not
-  1.** Cosmetic, one pixel in 16384, only in the general branch of
-  `renderFlats`.
-
-## Why TypeScript costs nothing here
-
-Types are erased; there is no runtime representation of a type in the output.
-With this project's `tsconfig`, the emitted JS is what you would write by hand
-— `dist/index.js` contains no injected helpers, and casts like `as PhysCode`
-vanish entirely.
-
-Three settings matter, and each is commented in `tsconfig.json`:
-
-- `useDefineForClassFields: false` — with it on, esbuild emits a bare field
-  declaration *and* the constructor assignment, doubling hidden-class
-  transitions on every instance.
-- `noUncheckedIndexedAccess: false` — with it on, every `zbuffer[i]` and
-  `renderSurface32[ofs]` gains `| undefined`, putting non-null assertions in
-  the hottest loops in the codebase.
-- `target: ES2022` — a lower target downlevels `?.`, `??` and class fields
-  into slower helper code.
-
-Plain `const` unions are used instead of `enum`, which would emit a runtime
-object and turn each member access into a property load.
+[ISC](LICENSE) © 2026 Raphaël Marandet
