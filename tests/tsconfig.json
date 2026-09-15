@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    /* Tests run under Node: they read fixtures off disk and render through
+       @napi-rs/canvas. The library itself never sees these.
+
+       This file must be named tsconfig.json and live in tests/: editors only
+       look for the nearest tsconfig.json above a file. Under any other name a
+       test file falls back to the root config, whose "types": [] hides
+       node:fs, and the editor reports TS2307 while `npm run typecheck` passes. */
+    "types": ["node"]
+  },
+  "include": ["../src", ".", "../demos", "../vitest.bench.config.ts"]
+}

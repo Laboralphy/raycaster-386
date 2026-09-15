@@ -536,7 +536,7 @@ optional `validate` hook instead, and the schema ships as data on its own entry
 point:
 
 ```ts
-import RCE_100_SCHEMA from 'raycaster-386/schema';
+import RCE_100_SCHEMA from '@laboralphy/raycaster-386/schema';
 
 await loadLevel(rc, level, {
     loadImage,
@@ -611,7 +611,7 @@ without a single line of `Engine`.
 |---|---|---|
 | **0. Core** — shared | Data both sides need: the cell map, grid, markers, geometry. | — |
 | **1. Rendering** — `raycaster-386` | Turning world state into pixels. | Time. Input. I/O. |
-| **2. Simulation** — `raycaster-386/simulation` | Advancing world state by a tick. | Importing Rendering. Owning a loop. Touching the DOM. |
+| **2. Simulation** — `@laboralphy/raycaster-386/simulation` | Advancing world state by a tick. | Importing Rendering. Owning a loop. Touching the DOM. |
 | **3. Game** — the caller, not shipped | The loop, input, rules, assets, audio, UI. | — |
 
 **The invariant is the arrow: Simulation never imports Rendering.** A god object
@@ -651,9 +651,9 @@ phases — is in [ENGINE_INVENTORY.md](ENGINE_INVENTORY.md).
 npm run check      # typecheck (src and tests) + tests + build
 npm test           # tests only
 npm run bench      # port vs original
-npm run build      # dist/index.js + dist/index.min.js
+npm run build      # dist/<entry>.js, shared code in dist/chunks/
 npm run typecheck  # tsc --noEmit, both configs
 ```
 
 `src` is type-checked with `types: []` so Node globals cannot leak into a
-browser library; tests get them via `tsconfig.tests.json`.
+browser library; tests get them via `tests/tsconfig.json`.

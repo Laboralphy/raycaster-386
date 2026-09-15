@@ -37,7 +37,7 @@
     "noEmit": true,
 
     /* The library is browser-only. Ambient Node types are made available
-       to tests via tsconfig.tests.json, never to src. */
+       to tests via tests/tsconfig.json, never to src. */
     "types": []
   },
   "include": ["src"]

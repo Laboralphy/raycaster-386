@@ -40,7 +40,7 @@ Four named tiers, each defined by what it *needs*:
 |---|---|---|
 | **Core** | `src/core/` | nothing |
 | **Rendering** | `raycaster-386` — all of `src/` bar the below | a screen |
-| **Simulation** | `raycaster-386/simulation` — `src/simulation/` | a clock |
+| **Simulation** | `@laboralphy/raycaster-386/simulation` — `src/simulation/` | a clock |
 | **Game** | the caller; `demos/` stands in for it | a player |
 
 **The invariant is the arrow: Simulation never imports Rendering.** It is

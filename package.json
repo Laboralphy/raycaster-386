@@ -6,6 +6,19 @@
     "main": "./dist/index.js",
     "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
+    "typesVersions": {
+        "*": {
+            "simulation": [
+                "./dist/simulation/index.d.ts"
+            ],
+            "schema": [
+                "./dist/level/schema.d.ts"
+            ],
+            "mapedit": [
+                "./dist/mapedit/index.d.ts"
+            ]
+        }
+    },
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",
@@ -27,18 +40,19 @@
     "files": [
         "dist"
     ],
+    "sideEffects": false,
     "scripts": {
         "build": "node scripts/build.mjs",
         "watch": "node scripts/build.mjs --watch",
         "types": "tsc -p tsconfig.json --emitDeclarationOnly --declaration --noEmit false --outDir dist",
-        "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.simulation.json && tsc -p tsconfig.tests.json",
+        "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.simulation.json && tsc -p tests/tsconfig.json",
         "lint": "eslint src demos",
         "lint:fix": "eslint --fix src demos",
         "format": "prettier --check src demos",
         "format:fix": "prettier --write src demos",
         "test": "vitest run",
         "coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.include='src/**' --coverage.reporter=text",
-        "check": "npm run typecheck && npm run test && npm run build",
+        "check": "npm run typecheck && npm run lint && npm run format && npm run test && npm run build",
         "prepublishOnly": "npm run check && npm run types",
         "test:watch": "vitest",
         "bench": "vitest run --config vitest.bench.config.ts",

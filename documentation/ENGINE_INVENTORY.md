@@ -17,7 +17,7 @@ The collision, tag and geometry machinery it pulls from `libs/` adds ~1,100.
 |---|---|---|---|
 | **0. Core** — shared | Data and maths both sides need: the cell map, grid, markers, geometry, bresenham, the cell codes. | nothing | — |
 | **1. Rendering** — `raycaster-386` | Turning world state into pixels: map rendering, textures, lighting, sprites, level loading. | a screen | Time. Input. I/O. |
-| **2. Simulation** — `raycaster-386/simulation` | Advancing world state by a tick: doors, movement, collision, triggers, actors. | a clock | Importing Rendering. Owning a loop. Touching the DOM. |
+| **2. Simulation** — `@laboralphy/raycaster-386/simulation` | Advancing world state by a tick: doors, movement, collision, triggers, actors. | a clock | Importing Rendering. Owning a loop. Touching the DOM. |
 | **3. Game** — the caller, not shipped here | The loop, input, rules, assets, audio, UI. | a player | — |
 
 Each tier is defined by what it *needs*. `ShadedTileSet` pre-computes distance

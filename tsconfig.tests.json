@@ -1,9 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    /* Tests run under Node: they read fixtures off disk and render through
-       @napi-rs/canvas. The library itself never sees these. */
-    "types": ["node"]
-  },
-  "include": ["src", "tests", "demos", "vitest.bench.config.ts"]
-}
