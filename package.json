@@ -1,6 +1,6 @@
 {
-    "name": "@laboralphy/raycaster-386",
-    "version": "0.1.0",
+    "name": "@laboralphy/raycaster386",
+    "version": "1.0.0",
     "description": "A raycasting engine in TypeScript. Renders like it's 1992; runs like it isn't.",
     "type": "module",
     "main": "./dist/index.js",

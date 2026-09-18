@@ -536,7 +536,7 @@ optional `validate` hook instead, and the schema ships as data on its own entry
 point:
 
 ```ts
-import RCE_100_SCHEMA from '@laboralphy/raycaster-386/schema';
+import RCE_100_SCHEMA from '@laboralphy/raycaster386/schema';
 
 await loadLevel(rc, level, {
     loadImage,
@@ -610,8 +610,8 @@ without a single line of `Engine`.
 | Tier | Owns | Never |
 |---|---|---|
 | **0. Core** — shared | Data both sides need: the cell map, grid, markers, geometry. | — |
-| **1. Rendering** — `raycaster-386` | Turning world state into pixels. | Time. Input. I/O. |
-| **2. Simulation** — `@laboralphy/raycaster-386/simulation` | Advancing world state by a tick. | Importing Rendering. Owning a loop. Touching the DOM. |
+| **1. Rendering** — `@laboralphy/raycaster386` | Turning world state into pixels. | Time. Input. I/O. |
+| **2. Simulation** — `@laboralphy/raycaster386/simulation` | Advancing world state by a tick. | Importing Rendering. Owning a loop. Touching the DOM. |
 | **3. Game** — the caller, not shipped | The loop, input, rules, assets, audio, UI. | — |
 
 **The invariant is the arrow: Simulation never imports Rendering.** A god object

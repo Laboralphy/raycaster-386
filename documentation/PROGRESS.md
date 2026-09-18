@@ -39,8 +39,8 @@ Four named tiers, each defined by what it *needs*:
 | Tier | Where | Needs |
 |---|---|---|
 | **Core** | `src/core/` | nothing |
-| **Rendering** | `raycaster-386` — all of `src/` bar the below | a screen |
-| **Simulation** | `@laboralphy/raycaster-386/simulation` — `src/simulation/` | a clock |
+| **Rendering** | `@laboralphy/raycaster386` — all of `src/` bar the below | a screen |
+| **Simulation** | `@laboralphy/raycaster386/simulation` — `src/simulation/` | a clock |
 | **Game** | the caller; `demos/` stands in for it | a player |
 
 **The invariant is the arrow: Simulation never imports Rendering.** It is
@@ -219,7 +219,8 @@ geometry, flood fill.
 
 ### What is worth doing next, in rough order
 
-1. **Package it**: the version is still 0.1.0 and nothing has been published.
+1. ~~**Package it**~~ — done. Published to npm as `@laboralphy/raycaster386` at 1.0.0 on
+   2026-09-18. The repository keeps its `raycaster-386` name.
 
 Done since this list was written: a second demo (`dark-village`), the vitest
 upgrade (now 5.0.0), the four steps that retire the original engine (below), and

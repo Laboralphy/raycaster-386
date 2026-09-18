@@ -31,7 +31,7 @@ every level against a 22 kB JSON schema on every load, which costs an npm
 dependency and a walk of a 120 kB document to catch what the map editor could
 have caught on save. `loadLevel` takes an optional `validate` callback
 instead, and the schema ships as data on its own entry point
-(`@laboralphy/raycaster-386/schema`), so a game can check its levels while developing and
+(`@laboralphy/raycaster386/schema`), so a game can check its levels while developing and
 drop both from its release build. What the library always does is stricter and
 free: an unknown `@SYMBOL` throws, where the original's translator passed the
 typo through as a string.

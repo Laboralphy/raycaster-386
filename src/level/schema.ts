@@ -3,13 +3,13 @@ import schema from './rce-100.json';
 /**
  * The RCE-100 JSON schema, exactly as the original engine shipped it.
  *
- * Its own entry point — `@laboralphy/raycaster-386/schema` — so that the 22 kB never
+ * Its own entry point — `@laboralphy/raycaster386/schema` — so that the 22 kB never
  * lands in the renderer bundle. Pair it with any JSON-schema validator and
  * hand the result to `loadLevel` as its `validate` hook:
  *
  * ```ts
  * import { Validator } from 'jsonschema';
- * import RCE_100_SCHEMA from '@laboralphy/raycaster-386/schema';
+ * import RCE_100_SCHEMA from '@laboralphy/raycaster386/schema';
  *
  * const v = new Validator();
  * const validate = (data: unknown) => {

@@ -237,7 +237,7 @@ server.
 ## Two endpoints that no longer need to exist
 
 **`/publish/` is gone.** `libs/generate` has been ported — it is
-`src/mapedit` in this repository, shipped as `@laboralphy/raycaster-386/mapedit`, with a
+`src/mapedit` in this repository, shipped as `@laboralphy/raycaster386/mapedit`, with a
 fidelity test proving it reproduces the original converter field for field on a
 real level. Export runs in the browser now. This is the step the earlier version
 of this document listed as future work; it is done.
@@ -284,7 +284,7 @@ About 1,250 lines, none of it framework-coupled — copy it across and add types
 
 | Piece | Lines | Note |
 |---|---|---|
-| ~~`libs/generate`~~ | ~~521~~ | **done** — now `src/mapedit`, `@laboralphy/raycaster-386/mapedit` |
+| ~~`libs/generate`~~ | ~~521~~ | **done** — now `src/mapedit`, `@laboralphy/raycaster386/mapedit` |
 | `block-renderer` | 306 | draws a block's faces to a canvas |
 | `silly-canvas-factory` | 192 | canvas pooling |
 | `grid-renderer` | 96 | draws the map grid; drop the `events` import |

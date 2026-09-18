@@ -10,7 +10,7 @@ cell layout are explained in the README's
 its full doc comment in the package's `.d.ts` files, which editors show on
 hover.
 
-- [`@laboralphy/raycaster-386`](#laboralphyraycaster-386)
+- [`@laboralphy/raycaster386`](#laboralphyraycaster-386)
   - [Core](#core)
   - [Canvas helpers](#canvas-helpers)
   - [Rendering](#rendering)
@@ -18,18 +18,18 @@ hover.
   - [Lighting](#lighting)
   - [Map building and level loading](#map-building-and-level-loading)
   - [The raycasting pipeline](#the-raycasting-pipeline)
-- [`@laboralphy/raycaster-386/simulation`](#laboralphyraycaster-386simulation)
+- [`@laboralphy/raycaster386/simulation`](#laboralphyraycaster-386simulation)
   - [Doors](#doors)
   - [Actors](#actors)
   - [Collision](#collision)
   - [Tags and triggers](#tags-and-triggers)
   - [Time and events](#time-and-events)
-- [`@laboralphy/raycaster-386/schema`](#laboralphyraycaster-386schema)
-- [`@laboralphy/raycaster-386/mapedit`](#laboralphyraycaster-386mapedit)
+- [`@laboralphy/raycaster386/schema`](#laboralphyraycaster-386schema)
+- [`@laboralphy/raycaster386/mapedit`](#laboralphyraycaster-386mapedit)
 
 ---
 
-## `@laboralphy/raycaster-386`
+## `@laboralphy/raycaster386`
 
 Core and rendering. Core is DOM-free and shared with the simulation; rendering
 needs a Canvas 2D implementation.
@@ -131,7 +131,7 @@ already visited.
 
 ## Canvas helpers
 
-Exported as the `Canvas` namespace: `import { Canvas } from '@laboralphy/raycaster-386'`.
+Exported as the `Canvas` namespace: `import { Canvas } from '@laboralphy/raycaster386'`.
 These need a DOM. The renderer itself loads nothing; `loadCanvas` and
 `loadCanvases` are conveniences for callers.
 
@@ -440,7 +440,7 @@ renderers. A game using `Renderer` does not need them.
 
 ---
 
-## `@laboralphy/raycaster-386/simulation`
+## `@laboralphy/raycaster386/simulation`
 
 World state advanced by ticks. Nothing here imports the renderer or touches the
 DOM, so all of it runs headless.
@@ -724,7 +724,7 @@ TypeScript. It is what `events` is on doors, tags and the collision solver.
 
 ---
 
-## `@laboralphy/raycaster-386/schema`
+## `@laboralphy/raycaster386/schema`
 
 No classes or functions: the RCE-100 JSON schema, as `RCE_100_SCHEMA` and as
 the default export. Pass it to a JSON-schema validator inside `loadLevel`'s
@@ -732,7 +732,7 @@ the default export. Pass it to a JSON-schema validator inside `loadLevel`'s
 
 ---
 
-## `@laboralphy/raycaster-386/mapedit`
+## `@laboralphy/raycaster386/mapedit`
 
 | Function | What it does |
 |---|---|

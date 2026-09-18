@@ -37,7 +37,7 @@ collisions and triggers that runs just as well on a server with no canvas.
 ## Installation
 
 ```bash
-npm install @laboralphy/raycaster-386
+npm install @laboralphy/raycaster386
 ```
 
 The package is **ESM only**: load it with `import`, or with `await import()`
@@ -50,10 +50,10 @@ under Node. The simulation, the schema and the MapEdit converter need nothing.
 
 | Import | Contains | Runs in |
 |---|---|---|
-| `@laboralphy/raycaster-386` | Core (`CellMap`, `Vector`, geometry, constants) and rendering (`Renderer`, `Sprite`, `MapHelper`, `loadLevel`, `buildObjects`, `SpriteBinding`) | a browser, for rendering |
-| `@laboralphy/raycaster-386/simulation` | `DoorPolicy`, `ActorRegistry`, `Actor`, `moveActor`, `Smasher`, `TagTriggers`, `Scheduler`, `Easing` | anywhere |
-| `@laboralphy/raycaster-386/schema` | The RCE-100 JSON schema, as data | anywhere |
-| `@laboralphy/raycaster-386/mapedit` | `convertMapEditLevel`, and the MapEdit save types | anywhere |
+| `@laboralphy/raycaster386` | Core (`CellMap`, `Vector`, geometry, constants) and rendering (`Renderer`, `Sprite`, `MapHelper`, `loadLevel`, `buildObjects`, `SpriteBinding`) | a browser, for rendering |
+| `@laboralphy/raycaster386/simulation` | `DoorPolicy`, `ActorRegistry`, `Actor`, `moveActor`, `Smasher`, `TagTriggers`, `Scheduler`, `Easing` | anywhere |
+| `@laboralphy/raycaster386/schema` | The RCE-100 JSON schema, as data | anywhere |
+| `@laboralphy/raycaster386/mapedit` | `convertMapEditLevel`, and the MapEdit save types | anywhere |
 
 Code shared between entry points is emitted once, so a `Vector` imported from
 the root is the same class the simulation works with.
@@ -63,8 +63,8 @@ the root is the same class the simulation works with.
 A five-by-five room, drawn from a hand-written map:
 
 ```ts
-import { Canvas, MapHelper, PHYS_NONE, PHYS_WALL, Renderer } from '@laboralphy/raycaster-386';
-import type { LevelMap } from '@laboralphy/raycaster-386';
+import { Canvas, MapHelper, PHYS_NONE, PHYS_WALL, Renderer } from '@laboralphy/raycaster386';
+import type { LevelMap } from '@laboralphy/raycaster386';
 
 const level: LevelMap = {
     legend: [
@@ -127,8 +127,8 @@ shading, textures, the map, the upper storey, decals and static lights — and
 hands back the rest.
 
 ```ts
-import { Canvas, Renderer, buildObjects, loadLevel } from '@laboralphy/raycaster-386';
-import type { RceLevel } from '@laboralphy/raycaster-386';
+import { Canvas, Renderer, buildObjects, loadLevel } from '@laboralphy/raycaster386';
+import type { RceLevel } from '@laboralphy/raycaster386';
 
 const renderer = new Renderer();
 // Before loading: the backdrop is scaled to the screen height as it loads.
@@ -166,9 +166,9 @@ schema and the validator out of a release build.
 
 ```ts
 import { Validator } from 'jsonschema';
-import RCE_100_SCHEMA from '@laboralphy/raycaster-386/schema';
-import { Canvas, Renderer, loadLevel } from '@laboralphy/raycaster-386';
-import type { RceLevel } from '@laboralphy/raycaster-386';
+import RCE_100_SCHEMA from '@laboralphy/raycaster386/schema';
+import { Canvas, Renderer, loadLevel } from '@laboralphy/raycaster386';
+import type { RceLevel } from '@laboralphy/raycaster386';
 
 const validator = new Validator();
 
@@ -198,7 +198,7 @@ by the renderer and the simulation alike.
 The map is always square, and `size` is its width and height in cells:
 
 ```ts
-import { Renderer } from '@laboralphy/raycaster-386';
+import { Renderer } from '@laboralphy/raycaster386';
 
 const renderer = new Renderer();
 renderer.setMapSize(32);
@@ -222,7 +222,7 @@ A world position converts to a cell, and back to that cell's centre, with the
 cell size from the level's metrics:
 
 ```ts
-import { cellCenter, worldToCell } from '@laboralphy/raycaster-386';
+import { cellCenter, worldToCell } from '@laboralphy/raycaster386';
 
 console.log(worldToCell(200, 90, 64)); // { x: 3, y: 1 }
 console.log(cellCenter(3, 1, 64)); // { x: 224, y: 96 }
@@ -274,7 +274,7 @@ block, how far the wall is set back.
 ### Reading and writing cells
 
 ```ts
-import { CellMap, PHYS_DOOR_UP, PHYS_WALL, materialOf, offsetOf, physOf } from '@laboralphy/raycaster-386';
+import { CellMap, PHYS_DOOR_UP, PHYS_WALL, materialOf, offsetOf, physOf } from '@laboralphy/raycaster386';
 
 const map = new CellMap();
 map.setSize(16);
@@ -309,9 +309,9 @@ simulation to the renderer: door cell updates, and an `ActorFrame` of what
 moved.
 
 ```ts
-import { Renderer, SpriteBinding, Vector } from '@laboralphy/raycaster-386';
-import { ActorRegistry, DoorPolicy, moveActor } from '@laboralphy/raycaster-386/simulation';
-import type { MotionContext, Thinker } from '@laboralphy/raycaster-386/simulation';
+import { Renderer, SpriteBinding, Vector } from '@laboralphy/raycaster386';
+import { ActorRegistry, DoorPolicy, moveActor } from '@laboralphy/raycaster386/simulation';
+import type { MotionContext, Thinker } from '@laboralphy/raycaster386/simulation';
 
 const TICK_MS = 1000 / 60;
 const spacing = 64;
@@ -385,8 +385,8 @@ The renderer knows which cell is under the crosshair, which is the usual way to
 open a door:
 
 ```ts
-import type { Renderer } from '@laboralphy/raycaster-386';
-import type { DoorPolicy } from '@laboralphy/raycaster-386/simulation';
+import type { Renderer } from '@laboralphy/raycaster386';
+import type { DoorPolicy } from '@laboralphy/raycaster386/simulation';
 
 function use(renderer: Renderer, doors: DoorPolicy): void {
     const aimed = renderer.aimedCell;
@@ -403,8 +403,8 @@ A sprite draws from a tileset, and is tied to an actor by its id. Bind it once;
 light when the actor is removed.
 
 ```ts
-import { ANIM_LOOP_FORWARD, Canvas, Renderer, SpriteBinding } from '@laboralphy/raycaster-386';
-import { ActorRegistry } from '@laboralphy/raycaster-386/simulation';
+import { ANIM_LOOP_FORWARD, Canvas, Renderer, SpriteBinding } from '@laboralphy/raycaster386';
+import { ActorRegistry } from '@laboralphy/raycaster386/simulation';
 
 const renderer = new Renderer();
 const binding = new SpriteBinding(renderer);
@@ -437,7 +437,7 @@ and the camera's position. Animation `duration` is in the unit you pass to
 
 ## Simulation
 
-Everything here comes from `@laboralphy/raycaster-386/simulation`, holds no
+Everything here comes from `@laboralphy/raycaster386/simulation`, holds no
 reference to a renderer, and advances only when you call it.
 
 ### Doors
@@ -485,7 +485,7 @@ A tag is a command string attached to cells — `teleport 12 3`, or
 turns movement across tagged cells into events:
 
 ```ts
-import { ActorRegistry, TagTriggers } from '@laboralphy/raycaster-386/simulation';
+import { ActorRegistry, TagTriggers } from '@laboralphy/raycaster386/simulation';
 
 const actors = new ActorRegistry();
 const tags = new TagTriggers();
@@ -514,7 +514,7 @@ under `level.unhandled.tags`.
 clock's, so a paused or replayed game stays in step:
 
 ```ts
-import { Easing, Scheduler } from '@laboralphy/raycaster-386/simulation';
+import { Easing, Scheduler } from '@laboralphy/raycaster386/simulation';
 
 const scheduler = new Scheduler();
 scheduler.delay(() => console.log('two seconds of ticks later'), 120);
@@ -536,7 +536,7 @@ while (!fade.over()) {
 Actors, doors and tags expose their state as plain, JSON-safe data:
 
 ```ts
-import type { ActorRegistry, DoorPolicy, TagTriggers } from '@laboralphy/raycaster-386/simulation';
+import type { ActorRegistry, DoorPolicy, TagTriggers } from '@laboralphy/raycaster386/simulation';
 
 function save(actors: ActorRegistry, doors: DoorPolicy, tags: TagTriggers): string {
     return JSON.stringify({ actors: actors.state, doors: doors.state, tags: tags.grid.state });
@@ -559,8 +559,8 @@ The simulation only needs a `CellMap`. Without a renderer, you own the map and
 apply the door updates to it directly:
 
 ```ts
-import { CellMap, PHYS_DOOR_UP, PHYS_WALL } from '@laboralphy/raycaster-386';
-import { DoorPolicy } from '@laboralphy/raycaster-386/simulation';
+import { CellMap, PHYS_DOOR_UP, PHYS_WALL } from '@laboralphy/raycaster386';
+import { DoorPolicy } from '@laboralphy/raycaster386/simulation';
 
 const map = new CellMap();
 map.setSize(16);
@@ -593,8 +593,8 @@ anywhere, but leaves the one host-specific step to you: combining tiles into a
 sheet.
 
 ```ts
-import { convertMapEditLevel } from '@laboralphy/raycaster-386/mapedit';
-import type { ImageAppender, MapEditLevel } from '@laboralphy/raycaster-386/mapedit';
+import { convertMapEditLevel } from '@laboralphy/raycaster386/mapedit';
+import type { ImageAppender, MapEditLevel } from '@laboralphy/raycaster386/mapedit';
 
 const append: ImageAppender = async (tiles, start, count) => {
     // Lay `count` tiles out left to right, starting at `start`, and store the sheet.
