@@ -99,6 +99,23 @@ export interface LightHandle {
     remove(): void;
 }
 
+/** Bytes held by a renderer, broken down by what holds them. */
+export interface MemoryUsage {
+    /** Wall, flat and sprite tilesets: their originals and shaded layers. */
+    tilesets: number;
+    /** Textures painted onto cell surfaces. */
+    decals: number;
+    /** The surface and cell light maps, which scale with the map size. */
+    lightMaps: number;
+    /** The backdrop, scaled to the screen. */
+    background: number;
+    /** The render canvas, plus the frame buffer the flat rasteriser reads. */
+    screen: number;
+    /** What upper storeys hold of their own. */
+    storey: number;
+    total: number;
+}
+
 /** Resources an upper storey shares with the floor below it. */
 export interface SharedResources {
     walls: ShadedTileSet | null;
@@ -306,6 +323,9 @@ export class Renderer {
     setFlatTextures(image: ImageSource): void {
         const s = this._metrics.spacing;
         this._flats = this.buildTileSet(image, s, s);
+        // Flats are sampled per pixel and never drawn, so the shaded layers
+        // are kept as pixels rather than as a canvas as well.
+        this._flats.setPixelStorage(true);
         this._dirty |= Dirty.Shading | Dirty.Flats;
         this.shareWithStorey();
     }
@@ -342,12 +362,53 @@ export class Renderer {
         this._tilesets = this._tilesets.filter((ts) => used.has(ts));
     }
 
-    /** Approximate bytes held by every tileset. */
-    getMemoryUsage(): { tilesets: number } {
+    /**
+     * Approximate bytes held by everything this renderer keeps in memory.
+     *
+     * Every field is measured, not estimated, from the canvases and typed
+     * arrays that exist. Nothing is counted twice: a tileset several sprites
+     * share counts once, and an upper storey counts only what it owns, since
+     * it draws with the textures and the canvas of the floor below.
+     */
+    getMemoryUsage(): MemoryUsage {
+        // Walls and flats are added explicitly: they live in `_tilesets` only
+        // until removeUnusedTileSets(), which keeps sprite tilesets alone.
+        const counted = new Set<ShadedTileSet>(this._tilesets);
+        const adopted = !this._firstFloor;
+        if (adopted) {
+            // Owned by the ground floor, which reports them.
+            counted.delete(this._walls as ShadedTileSet);
+            counted.delete(this._flats as ShadedTileSet);
+        } else {
+            if (this._walls !== null) {
+                counted.add(this._walls);
+            }
+            if (this._flats !== null) {
+                counted.add(this._flats);
+            }
+        }
+        let tilesets = 0;
+        for (const ts of counted) {
+            tilesets += ts.getMemoryUsage();
+        }
+
+        const { decals, lightMaps } = this._csm.getMemoryUsage();
+        const bg = this._background;
+        const background = bg === null ? 0 : bg.width * bg.height * 4;
+        const canvas = this._renderCanvas;
+        const screen =
+            (adopted || canvas === null ? 0 : canvas.width * canvas.height * 4) +
+            (this._flatContext.renderSurface?.data.byteLength ?? 0);
+        const storey = this._storey?.getMemoryUsage().total ?? 0;
+
         return {
-            // The original called getConsumedBytes(), which does not exist on
-            // ShadedTileSet, so this method always threw.
-            tilesets: this._tilesets.reduce((sum, ts) => sum + ts.getMemoryUsage(), 0),
+            tilesets,
+            decals,
+            lightMaps,
+            background,
+            screen,
+            storey,
+            total: tilesets + decals + lightMaps + background + screen + storey,
         };
     }
 
@@ -472,9 +533,19 @@ export class Renderer {
         this._renderContext = res.context;
         this._renderCanvas = res.canvas;
         this._offsetTop = res.offsetTop;
-        if (this._flats !== null) {
-            this._flatContext.image = this._flats.getImage();
-        }
+        // Point at the ground floor's flat pixels rather than reading a copy
+        // of our own. Reassigned outright: the previous code only refreshed
+        // `image`, leaving a storey sampling the atlas it had cached before
+        // the floor below replaced its flat textures.
+        this.useFlatPixels();
+    }
+
+    /** Points the flat rasteriser at the current flat tileset's pixels. */
+    private useFlatPixels(): void {
+        const fc = this._flatContext;
+        const flats = this._flats;
+        fc.pixels32 = flats?.getPixels32() ?? null;
+        fc.pixelsWidth = flats?.getPixels()?.width ?? 0;
     }
 
     private shareWithStorey(): void {
@@ -694,7 +765,7 @@ export class Renderer {
                 this._flats.setShadingLayerCount(s.shades);
                 this._flats.compute(s.color, s.filter, s.brightness);
                 resetFlatContext(this._flatContext);
-                this._flatContext.image = this._flats.getImage();
+                this.useFlatPixels();
             }
             this._csm.shadeAllSurfaces(s.shades, s.color, s.filter, s.brightness);
             for (const ts of this._tilesets) {
@@ -705,7 +776,7 @@ export class Renderer {
             }
         } else if (dirty & Dirty.Flats) {
             resetFlatContext(this._flatContext);
-            this._flatContext.image = this._flats?.getImage() ?? null;
+            this.useFlatPixels();
         }
         this.shareWithStorey();
     }
@@ -734,6 +805,8 @@ export class Renderer {
                 offsetTop: 0,
                 stretch: false,
                 firstFloor: this._firstFloor,
+                coverTop: new Int32Array(0),
+                coverBottom: new Int32Array(0),
             } as RenderContext;
         }
         const m = c as Mutable<RenderContext>;
@@ -747,6 +820,10 @@ export class Renderer {
         m.shadingFactor = this.shadingFactor;
         m.offsetTop = this._offsetTop;
         m.stretch = this._stretch;
+        if (m.coverTop.length !== m.screenWidth) {
+            m.coverTop = new Int32Array(m.screenWidth);
+            m.coverBottom = new Int32Array(m.screenWidth);
+        }
         return c;
     }
 
@@ -799,6 +876,11 @@ export class Renderer {
         const zbuffer = scene.zbuffer;
         const middle = width >> 1;
         const exclusion = this._exclusionRegistry;
+
+        // An empty band per column: createScreenSlice widens it for every
+        // opaque wall it emits, and the flat rasteriser reads the result.
+        ctx.coverTop.fill(ctx.screenHeight);
+        ctx.coverBottom.fill(0);
 
         for (let i = 0; i < width; ++i) {
             scene.resume.active = false;

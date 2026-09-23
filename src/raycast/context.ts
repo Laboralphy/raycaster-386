@@ -64,6 +64,17 @@ export interface RenderContext {
     stretch: boolean;
     /** False for the upper storey instance. */
     firstFloor: boolean;
+    /**
+     * Per screen column, the rows an opaque wall will be drawn over.
+     *
+     * Filled while the z-buffer is cast and read by the flat rasteriser, which
+     * skips the floor and ceiling pixels that fall inside the band: the wall
+     * is drawn after the flats and repaints every one of them. `coverTop` is
+     * the first covered row and `coverBottom` the first row past the band, so
+     * an untouched column reads as an empty band.
+     */
+    coverTop: Int32Array;
+    coverBottom: Int32Array;
 }
 
 /** Narrowing helper for the four vertical faces. */

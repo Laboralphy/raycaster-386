@@ -39,6 +39,7 @@ export type {
     ShadingSettings,
     CellMaterial,
     LightHandle,
+    MemoryUsage,
     SharedResources,
 } from './Renderer.js';
 export { createScene } from './raycast/Scene.js';

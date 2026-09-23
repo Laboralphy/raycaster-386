@@ -150,6 +150,21 @@ export function createScreenSlice(
         slice[6] -= slice[8];
         slice[8] <<= 1;
     }
+
+    // Record what this slice will hide, once its rectangle is final. Only a
+    // slice that is actually drawn, from a tile with no translucent pixel,
+    // hides anything: everything else lets the floor show through. An upper
+    // storey is exempt because it is drawn *before* the flats, not after.
+    if (slice[0] !== null && ctx.firstFloor && tileset.isTileOpaque(tile)) {
+        const top = slice[6];
+        const bottom = top + slice[8];
+        if (top < ctx.coverTop[x]) {
+            ctx.coverTop[x] = top;
+        }
+        if (bottom > ctx.coverBottom[x]) {
+            ctx.coverBottom[x] = bottom;
+        }
+    }
     return slice;
 }
 

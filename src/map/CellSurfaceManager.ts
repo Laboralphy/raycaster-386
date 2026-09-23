@@ -8,7 +8,6 @@ import {
     type Face,
     type WallFace,
 } from '../consts.js';
-import { context2d } from '../core/canvas.js';
 import { ShadedTileSet } from '../texture/ShadedTileSet.js';
 
 /**
@@ -222,6 +221,9 @@ export class CellSurfaceManager {
         surface.imageData = null;
         surface.imageData32 = null;
         const ts = new ShadedTileSet();
+        // A decal on a floor or a ceiling is sampled per pixel by the flat
+        // rasteriser and never drawn, so it holds its shaded layers as pixels.
+        ts.setPixelStorage(!isWallFace(face));
         ts.setImage(tile, tile.width, tile.height);
         surface.tileset = ts;
     }
@@ -258,13 +260,9 @@ export class CellSurfaceManager {
         }
         ts.setShadingLayerCount(shades);
         ts.compute(fogColor, filter, brightness);
-        if (face >= 4) {
-            const cvs = ts.getImage();
-            if (cvs !== null) {
-                const imgData = context2d(cvs).getImageData(0, 0, cvs.width, cvs.height);
-                surface.imageData = imgData;
-                surface.imageData32 = new Uint32Array(imgData.data.buffer);
-            }
+        if (!isWallFace(face)) {
+            surface.imageData = ts.getPixels();
+            surface.imageData32 = ts.getPixels32();
         }
     }
 
@@ -293,6 +291,31 @@ export class CellSurfaceManager {
                 );
             }
         }
+    }
+
+    /**
+     * Approximate bytes held by painted decals and by the light maps.
+     *
+     * Decals are counted once each: {@link rotateWallSurfaces} moves one
+     * tileset between the faces of a cell rather than copying it.
+     */
+    getMemoryUsage(): { decals: number; lightMaps: number } {
+        const counted = new Set<ShadedTileSet>();
+        const s = this._surfaces;
+        for (let i = 0, l = s.length; i < l; ++i) {
+            const ts = s[i].tileset;
+            if (ts !== null) {
+                counted.add(ts);
+            }
+        }
+        let decals = 0;
+        for (const ts of counted) {
+            decals += ts.getMemoryUsage();
+        }
+        return {
+            decals,
+            lightMaps: this._surfaceLightMaps.byteLength + this._lightMap.byteLength,
+        };
     }
 
     /** Clears every surface light level back to zero. */
