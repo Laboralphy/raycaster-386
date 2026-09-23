@@ -52,6 +52,8 @@ export { createScreenSlice } from './raycast/createScreenSlice.js';
 export { resolveTile } from './raycast/context.js';
 export type { RenderContext, CellCodes, SurfaceTile } from './raycast/context.js';
 export { renderFlats, createFlatContext, resetFlatContext } from './render/renderFlats.js';
+export { Profiler, PHASE_HELP } from './render/Profiler.js';
+export type { Phase, ProfileReport } from './render/Profiler.js';
 export type { FlatContext } from './render/renderFlats.js';
 export { renderScreenSlice, renderScreenSliceBuffer } from './render/renderScreenSlice.js';
 export { renderSprite, renderSprites } from './render/renderSprites.js';

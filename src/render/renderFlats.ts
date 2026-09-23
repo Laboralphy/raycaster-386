@@ -89,8 +89,13 @@ export function renderFlats(
     fc: FlatContext
 ): void {
     const aFloorSurf = fc.pixels32;
+    const prof = ctx.profiler;
     if (aFloorSurf === null) {
         return;
+    }
+    if (prof !== null) {
+        prof.probe(renderContext);
+        prof.mark('flush');
     }
     const w = ctx.screenWidth;
     const h = ctx.screenWidth >> 1;
@@ -99,6 +104,7 @@ export function renderFlats(
     fc.renderSurface = renderContext.getImageData(0, 0, w, hPhys << 1);
     fc.renderSurface32 = new Uint32Array(fc.renderSurface.data.buffer);
     resolveFlatTiles(fc, ctx.cellCodes);
+    prof?.mark('flatsRead');
 
     const aRenderSurf = fc.renderSurface32;
 
@@ -545,5 +551,7 @@ export function renderFlats(
             }
         }
     }
+    prof?.mark('flatsLoop');
     renderContext.putImageData(fc.renderSurface, 0, 0);
+    prof?.mark('flatsWrite');
 }

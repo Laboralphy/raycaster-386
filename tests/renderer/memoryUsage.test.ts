@@ -73,7 +73,7 @@ describe('memory usage', () => {
         );
     });
 
-    it('counts a storey\'s adopted textures on the floor that owns them', () => {
+    it("counts a storey's adopted textures on the floor that owns them", () => {
         installDom();
         const rc = new Renderer();
         rc.setScreen({ width: 64, height: 64 });
@@ -87,5 +87,36 @@ describe('memory usage', () => {
         expect(m.tilesets).toBe(0);
         expect(m.screen).toBe(0);
         expect(rc.getMemoryUsage().tilesets).toBeGreaterThan(0);
+    });
+});
+
+describe('texture warm-up', () => {
+    it('draws every drawn texture, and leaves the frame as it found it', () => {
+        const spec = scene('decals');
+        const rc = buildPortRenderer(spec);
+
+        // Before any frame: it has to bring the canvas up itself rather than
+        // wait for a render, or a game calling it on a loading screen — which
+        // is the whole point — would warm nothing.
+        rc.warmUpTextures();
+        const canvas = rc.renderCanvas;
+        expect(canvas).not.toBeNull();
+
+        // Whatever it scribbled is gone: the frame is the cleared black the
+        // renderer starts from.
+        const px = canvas!.getContext('2d')!.getImageData(0, 0, 1, 1).data;
+        expect(Array.from(px)).toEqual([0, 0, 0, 255]);
+
+        // And a frame drawn after it still matches the baseline.
+        const first = renderPortFrame(rc, spec.cameras[0]);
+        const again = renderPortFrame(buildPortRenderer(spec), spec.cameras[0]);
+        expect(Array.from(first.data)).toEqual(Array.from(again.data));
+    });
+
+    it('is safe before any texture is set', () => {
+        installDom();
+        const rc = new Renderer();
+        rc.setScreen({ width: 32, height: 32 });
+        expect(() => rc.warmUpTextures()).not.toThrow();
     });
 });

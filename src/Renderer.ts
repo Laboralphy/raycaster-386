@@ -1,4 +1,5 @@
 import {
+    FACE_COUNT,
     METRIC_LIGHTMAP_SCALE,
     PHYS_INVISIBLE_BLOCK,
     PHYS_NONE,
@@ -42,6 +43,7 @@ import {
     type FlatContext,
 } from './render/renderFlats.js';
 import { renderScreenSliceBuffer } from './render/renderScreenSlice.js';
+import type { Profiler } from './render/Profiler.js';
 import { renderSprites } from './render/renderSprites.js';
 import { renderBackground } from './render/renderBackground.js';
 
@@ -160,6 +162,13 @@ export class Renderer {
      * actually changed at runtime.
      */
     shadingFactor = 50;
+
+    /**
+     * Collects per-phase frame timings while set. Null, the default, costs a
+     * null check per phase. See {@link Profiler}: a profiled frame is slower
+     * than a real one, deliberately.
+     */
+    profiler: Profiler | null = null;
 
     /** Smaller values dim the whole scene faster with distance. */
     private _screen: ScreenSettings = { ...DEFAULT_SCREEN };
@@ -360,6 +369,58 @@ export class Renderer {
     removeUnusedTileSets(): void {
         const used = new Set(this._sprites.map((s) => s.getTileSet()));
         this._tilesets = this._tilesets.filter((ts) => used.has(ts));
+    }
+
+    /**
+     * Draws every texture once, so that the first frames need not.
+     *
+     * A browser does not hand a canvas to the GPU when it is decoded, but the
+     * first time something samples it. For a level with fifty-odd atlases that
+     * lands on the first frames as a stutter: measured on the demo level in
+     * Firefox, a cold frame cost 33 ms against 8 ms warm, and the cost was
+     * charged to whichever pass happened to touch each atlas first.
+     *
+     * Call it once, after the textures are in and before the first
+     * {@link render} — while a loading screen is still up, which is the point.
+     * Each texture is drawn whole into a single pixel: the sampling costs
+     * nothing, and it is being sampled at all that makes it resident.
+     *
+     * Flats are left out on purpose. The flat rasteriser reads them as pixels
+     * and never draws them, so they are never uploaded.
+     */
+    warmUpTextures(): void {
+        this.revalidate();
+        const ctx = this._renderContext;
+        if (ctx === null) {
+            return;
+        }
+        const touch = (image: HTMLCanvasElement | null): void => {
+            if (image === null || image.width === 0 || image.height === 0) {
+                return;
+            }
+            ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, 1, 1);
+        };
+
+        touch(this._background);
+        touch(this._walls?.getImage() ?? null);
+        for (const ts of this._tilesets) {
+            if (ts !== this._flats) {
+                touch(ts.getImage());
+            }
+        }
+        // Decals painted on walls are drawn like the walls they cover; the
+        // ones on floors and ceilings are sampled, like the flats.
+        const surfaces = this._csm.surfaces;
+        for (let i = 0, l = surfaces.length; i < l; ++i) {
+            if (i % FACE_COUNT < 4) {
+                touch(surfaces[i].tileset?.getImage() ?? null);
+            }
+        }
+
+        // The corner this scribbled in belongs to the next frame, which clears
+        // before drawing anyway; leaving it dirty would still be untidy.
+        this.clear(ctx);
+        this._storey?.warmUpTextures();
     }
 
     /**
@@ -807,6 +868,7 @@ export class Renderer {
                 firstFloor: this._firstFloor,
                 coverTop: new Int32Array(0),
                 coverBottom: new Int32Array(0),
+                profiler: null,
             } as RenderContext;
         }
         const m = c as Mutable<RenderContext>;
@@ -820,6 +882,7 @@ export class Renderer {
         m.shadingFactor = this.shadingFactor;
         m.offsetTop = this._offsetTop;
         m.stretch = this._stretch;
+        m.profiler = this.profiler;
         if (m.coverTop.length !== m.screenWidth) {
             m.coverTop = new Int32Array(m.screenWidth);
             m.coverBottom = new Int32Array(m.screenWidth);
@@ -938,28 +1001,51 @@ export class Renderer {
      * instance — kept whatever the previous frame drew there.
      */
     render(x: number, y: number, angle: number, height: number): void {
+        const prof = this.profiler;
+        prof?.startFrame();
         this.revalidate();
         this.updateStaticLightMap();
+        prof?.mark('setup');
 
         const scene = this.computeScene(x, y, angle, height);
         const renderContext = this._renderContext;
         if (renderContext === null) {
             return;
         }
+        prof?.mark('raycast');
 
         this.clear(renderContext);
+        prof?.mark('clear');
         renderBackground(
             this._background,
             renderContext,
             this._screen.height,
             this._bgOffset + this._bgCameraOffset
         );
+        prof?.mark('background');
         if (scene.storeyScene !== null) {
-            renderScreenSliceBuffer(scene.storeyScene, renderContext);
+            // The storey is drawn first, so anything an opaque ground-floor
+            // wall will cover is skipped rather than drawn and painted over.
+            const ctx = this.context();
+            renderScreenSliceBuffer(scene.storeyScene, renderContext, {
+                top: ctx.coverTop,
+                bottom: ctx.coverBottom,
+            });
         }
+        prof?.mark('storey');
+        // The flat rasteriser marks its own phases, the first of which is the
+        // flush that everything above is really paying for.
         renderFlats(this.context(), scene, renderContext, this._flatContext);
         renderScreenSliceBuffer(scene, renderContext);
+        prof?.mark('slices');
+        if (prof !== null) {
+            // Nothing else reads pixels after the slices, so without this they
+            // would be rasterised in the next frame and charged to it.
+            prof.probe(renderContext);
+            prof.mark('present');
+        }
         this._debugDisplay.display(renderContext, 0, this._offsetTop);
+        prof?.endFrame();
     }
 
     /**

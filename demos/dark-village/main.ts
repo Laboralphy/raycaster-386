@@ -1,4 +1,4 @@
-import { Canvas } from '../../src';
+import { Canvas, PHASE_HELP, Profiler } from '../../src';
 import type { RceLevel } from '../../src';
 import { LEVEL_URL, TICK_MS } from './level';
 import { World } from './world';
@@ -49,10 +49,58 @@ async function main(): Promise<void> {
         status.textContent = `loading textures... ${++decoded}`;
         return image;
     });
+    // Textures reach the GPU when something first samples them, which without
+    // this is the first few frames. Paying for it here costs a moment of the
+    // loading screen instead of a stutter once the player has control.
+    status.textContent = 'warming textures...';
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    world.renderer.warmUpTextures();
     status.textContent = '';
 
     const target = canvas.getContext('2d') as CanvasRenderingContext2D;
     target.imageSmoothingEnabled = false;
+
+    // Profiling, on P. Off by default: it forces the canvas to rasterise at
+    // two points in the frame, which is the only way to learn what the drawing
+    // actually costs, and which makes the frame slower while it is on.
+    const panel = document.getElementById('profile') as HTMLElement;
+    const profiler = new Profiler();
+    let profiling = false;
+    let reportAt = 0;
+    let shades = world.renderer.shading.shades;
+    window.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if (key === 'p') {
+            profiling = !profiling;
+            world.renderer.profiler = profiling ? profiler : null;
+            profiler.reset();
+            reportAt = performance.now() + 1000;
+            panel.style.display = profiling ? 'block' : 'none';
+            panel.textContent = 'measuring...';
+        } else if (key === 'm') {
+            // Fewer shading layers means a smaller texture atlas. If the cost
+            // of drawing is the GPU re-uploading atlases it could not keep
+            // resident, this moves the frame rate; if it is the number of draw
+            // calls, it does nothing.
+            const order = [16, 8, 4, 2];
+            const s = world.renderer.shading;
+            shades = order[(order.indexOf(shades) + 1) % order.length];
+            world.renderer.setShading({ ...s, shades });
+            profiler.reset();
+            reportAt = performance.now() + 1000;
+        } else if (key === 'o' && profiling) {
+            // Without the stalls the phases still add up to the frame, but the
+            // drawing lands wherever the canvas got round to it.
+            profiler.flushProbe = !profiler.flushProbe;
+            profiler.reset();
+            reportAt = performance.now() + 1000;
+        }
+    });
+
+    const legend = (): string =>
+        Object.entries(PHASE_HELP)
+            .map(([phase, what]) => `  ${phase.padEnd(11)} ${what}`)
+            .join('\n');
 
     im.plugListeners(canvas);
 
@@ -80,6 +128,19 @@ async function main(): Promise<void> {
             target.drawImage(source, 0, 0, canvas.width, canvas.height);
         }
         readout.textContent = hud(world, fps);
+
+        if (profiling && now >= reportAt) {
+            panel.textContent = [
+                `${WIDTH}x${HEIGHT}   ${fps.toFixed(0)} fps   stalls ${profiler.flushProbe ? 'on' : 'off'} (O)`,
+                `${shades} shades   ${(world.renderer.getMemoryUsage().total / 1048576).toFixed(1)} MB of textures (M)`,
+                '',
+                profiler.format(),
+                '',
+                legend(),
+            ].join('\n');
+            profiler.reset();
+            reportAt = now + 1000;
+        }
         requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);

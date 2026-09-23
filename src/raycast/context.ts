@@ -1,6 +1,7 @@
 import type { Face, WallFace } from '../consts.js';
 import type { CellMap } from '../core/CellMap.js';
 import type { CellSurfaceManager } from '../map/CellSurfaceManager.js';
+import type { Profiler } from '../render/Profiler.js';
 import type { ShadedTileSet } from '../texture/ShadedTileSet.js';
 import type { TileAnimation } from '../texture/TileAnimation.js';
 
@@ -75,6 +76,8 @@ export interface RenderContext {
      */
     coverTop: Int32Array;
     coverBottom: Int32Array;
+    /** Collects per-phase timings when one is attached; null by default. */
+    profiler: Profiler | null;
 }
 
 /** Narrowing helper for the four vertical faces. */

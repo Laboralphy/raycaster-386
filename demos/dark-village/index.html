@@ -38,6 +38,19 @@
                 min-height: 1.5em;
                 color: #7d8694;
             }
+            #profile {
+                display: none;
+                margin: 0;
+                padding: 10px 14px;
+                max-width: min(96vw, 960px);
+                overflow-x: auto;
+                background: #1a1d23;
+                border: 1px solid #2a2f38;
+                border-radius: 4px;
+                color: #a8b0bd;
+                font: inherit;
+                white-space: pre;
+            }
             #status {
                 min-height: 1.5em;
                 color: #d8a657;
@@ -57,11 +70,12 @@
     <body>
         <canvas id="screen" width="320" height="200"></canvas>
         <div id="readout"></div>
+        <pre id="profile"></pre>
         <div id="status"></div>
         <p>
             <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>&larr;</kbd
             ><kbd>&rarr;</kbd> turn &nbsp; click to capture the mouse &nbsp; <kbd>E</kbd> use
-            (doors, tags)
+            (doors, tags) &nbsp; <kbd>P</kbd> profile &nbsp; <kbd>M</kbd> shading layers
         </p>
         <script type="module" src="dist/demo.js"></script>
     </body>
