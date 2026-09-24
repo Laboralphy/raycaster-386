@@ -5,6 +5,8 @@ import { buildPortRenderer, renderPortFrame } from '../harness/portRenderer.js';
 import { SCENES } from '../harness/scenes.js';
 import { Renderer } from '../../src/Renderer.js';
 import { ShadedTileSet } from '../../src/texture/ShadedTileSet.js';
+import { shadeCache } from '../../src/texture/ShadeCache.js';
+import { createCanvas } from '../../src/core/canvas.js';
 
 const LAYERS = 16;
 const TILE = 16;
@@ -68,9 +70,13 @@ describe('memory usage', () => {
         expect(m.decals).toBeGreaterThan(0);
         expect(m.lightMaps).toBeGreaterThan(0);
         expect(m.screen).toBeGreaterThan(0);
-        expect(m.total).toBe(
+        expect(m.resident).toBe(
             m.tilesets + m.decals + m.lightMaps + m.background + m.screen + m.storey
         );
+        expect(m.working).toBe(m.shadeCache + m.frameBuffer);
+        expect(m.total).toBe(m.resident + m.working);
+        // What a level costs to hold must not move as sprites are drawn.
+        expect(m.frameBuffer).toBeGreaterThan(0);
     });
 
     it("counts a storey's adopted textures on the floor that owns them", () => {
@@ -118,5 +124,105 @@ describe('texture warm-up', () => {
         const rc = new Renderer();
         rc.setScreen({ width: 32, height: 32 });
         expect(() => rc.warmUpTextures()).not.toThrow();
+    });
+});
+
+describe('lazy sprite shading', () => {
+    it('shades a tile on demand and reuses it', () => {
+        installDom();
+        const ts = new ShadedTileSet();
+        ts.setShadingLayerCount(LAYERS);
+        ts.setLazyShading(true);
+        ts.setImage(buildAtlas(4, TILE, TILE), TILE, TILE);
+        ts.compute('black', null, 0);
+
+        // Only the base is stored: one tile row, not sixteen.
+        expect(ts.getImage()!.height).toBe(TILE);
+
+        const target = createCanvas(TILE, TILE);
+        const ctx = target.getContext('2d') as CanvasRenderingContext2D;
+        shadeCache.clear();
+        shadeCache.resetStats();
+        ts.drawTile(ctx, TILE, 3 * TILE, TILE, TILE, 0, 0, TILE, TILE);
+        expect(shadeCache.stats().entries).toBe(1);
+        ts.drawTile(ctx, TILE, 3 * TILE, TILE, TILE, 0, 0, TILE, TILE);
+        expect(shadeCache.stats().hits).toBe(1);
+    });
+
+    it('draws what the stored layer would have held', () => {
+        installDom();
+        const source = buildAtlas(4, TILE, TILE);
+        const eager = new ShadedTileSet();
+        eager.setShadingLayerCount(LAYERS);
+        eager.setImage(source, TILE, TILE);
+        eager.compute('black', null, 0);
+
+        const lazy = new ShadedTileSet();
+        lazy.setShadingLayerCount(LAYERS);
+        lazy.setLazyShading(true);
+        lazy.setImage(source, TILE, TILE);
+        lazy.compute('black', null, 0);
+
+        // The tile itself is identical; what differs between the two, and only
+        // once drawn scaled, is which texel a boundary row samples.
+        for (const level of [0, 7, 15]) {
+            const a = eager.extractTile(2, level);
+            const b = lazy.extractTile(2, level);
+            const pa = (a.getContext('2d') as CanvasRenderingContext2D).getImageData(
+                0,
+                0,
+                TILE,
+                TILE
+            );
+            const pb = (b.getContext('2d') as CanvasRenderingContext2D).getImageData(
+                0,
+                0,
+                TILE,
+                TILE
+            );
+            expect(Array.from(pb.data)).toEqual(Array.from(pa.data));
+        }
+    });
+
+    it('keeps itself under the budget', () => {
+        installDom();
+        const ts = new ShadedTileSet();
+        ts.setShadingLayerCount(LAYERS);
+        ts.setLazyShading(true);
+        ts.setImage(buildAtlas(8, TILE, TILE), TILE, TILE);
+        ts.compute('black', null, 0);
+
+        const target = createCanvas(TILE, TILE);
+        const ctx = target.getContext('2d') as CanvasRenderingContext2D;
+        shadeCache.clear();
+        shadeCache.setBudget(TILE * TILE * 4 * 4);
+        for (let tile = 0; tile < 8; ++tile) {
+            for (let level = 0; level < LAYERS; ++level) {
+                ts.drawTile(ctx, tile * TILE, level * TILE, TILE, TILE, 0, 0, TILE, TILE);
+            }
+        }
+        const stats = shadeCache.stats();
+        expect(stats.bytes).toBeLessThanOrEqual(stats.budget);
+        expect(stats.evictions).toBeGreaterThan(0);
+        shadeCache.setBudget(4 * 1024 * 1024);
+    });
+
+    it('drops what it cached when the shading changes', () => {
+        installDom();
+        const rc = new Renderer();
+        rc.setScreen({ width: 64, height: 64 });
+        const ts = rc.buildTileSet(buildAtlas(4, TILE, TILE), TILE, TILE);
+        expect(ts.lazyShading).toBe(true);
+        ts.compute('black', null, 0);
+
+        const target = createCanvas(TILE, TILE);
+        const ctx = target.getContext('2d') as CanvasRenderingContext2D;
+        shadeCache.clear();
+        ts.drawTile(ctx, 0, TILE, TILE, TILE, 0, 0, TILE, TILE);
+        expect(shadeCache.stats().entries).toBe(1);
+
+        // A re-shade makes every cached tile wrong, so none may survive it.
+        ts.compute('#204060', null, 0.2);
+        expect(shadeCache.stats().entries).toBe(0);
     });
 });

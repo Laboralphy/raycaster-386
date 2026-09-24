@@ -101,20 +101,47 @@ export interface LightHandle {
     remove(): void;
 }
 
-/** Bytes held by a renderer, broken down by what holds them. */
+/**
+ * Bytes held by a renderer, broken down by what holds them.
+ *
+ * Two kinds, and the difference is what matters when deciding whether a level
+ * is too big: **resident** memory is what the level costs for as long as it is
+ * loaded, and **working** memory fills as the renderer draws, stays under a
+ * bound, and is recycled. Only the first grows with the size of a level.
+ */
 export interface MemoryUsage {
     /** Wall, flat and sprite tilesets: their originals and shaded layers. */
     tilesets: number;
+    /**
+     * Sprite frames shaded on demand and kept in the shared cache.
+     *
+     * Working memory rather than a cost of the level: it fills as sprites are
+     * drawn, is bounded by the cache's budget, and is recycled. Counted in
+     * {@link total} but kept out of {@link tilesets}, so that number stays a
+     * statement about what the level holds.
+     */
+    shadeCache: number;
     /** Textures painted onto cell surfaces. */
     decals: number;
     /** The surface and cell light maps, which scale with the map size. */
     lightMaps: number;
     /** The backdrop, scaled to the screen. */
     background: number;
-    /** The render canvas, plus the frame buffer the flat rasteriser reads. */
+    /** The canvas frames are drawn into. */
     screen: number;
-    /** What upper storeys hold of their own. */
+    /** The resident memory of upper storeys, over what they share. */
     storey: number;
+    /**
+     * The pixel buffer the flat rasteriser reads the frame back into.
+     *
+     * Working memory: `getImageData` hands over a new one every frame and the
+     * collector takes the last. It scales with the screen, never the level.
+     */
+    frameBuffer: number;
+    /** What the level costs to hold: everything above but the last two. */
+    resident: number;
+    /** Memory that fills as the renderer draws and is recycled. */
+    working: number;
     total: number;
 }
 
@@ -205,6 +232,16 @@ export class Renderer {
     private _scanCells: MarkerRegistry | null = null;
     private _scanFrontCells: MarkerRegistry | null = null;
     private _aimedCell: AimedCell | null = null;
+
+    /**
+     * Tilesets that have had a sprite at some point.
+     *
+     * {@link removeUnusedTileSets} collects what no sprite references, and
+     * this is how it tells a sheet whose sprites have all gone from one that
+     * was loaded ahead of time and has yet to be used. Collecting the second
+     * kind is what made that method unsafe to call.
+     */
+    private _everBound = new Set<ShadedTileSet>();
 
     /** Reused every ray instead of allocating a Set per screen column. */
     private _exclusionRegistry = new MarkerRegistry();
@@ -323,15 +360,23 @@ export class Renderer {
      * `metrics.height` tall.
      */
     setWallTextures(image: ImageSource): void {
+        // Replacing an atlas used to leave the old one registered, re-shaded
+        // on every shading change for as long as the renderer lived.
+        this.releaseTileSet(this._walls);
         this._walls = this.buildTileSet(image, this._metrics.spacing, this._metrics.height);
+        // Walls are drawn a slice per screen column, far too often to shade
+        // one at a time; they keep every layer.
+        this._walls.setLazyShading(false);
         this._dirty |= Dirty.Shading;
         this.shareWithStorey();
     }
 
     /** Sets the floor and ceiling atlas. Tiles are square. */
     setFlatTextures(image: ImageSource): void {
+        this.releaseTileSet(this._flats);
         const s = this._metrics.spacing;
         this._flats = this.buildTileSet(image, s, s);
+        this._flats.setLazyShading(false);
         // Flats are sampled per pixel and never drawn, so the shaded layers
         // are kept as pixels rather than as a canvas as well.
         this._flats.setPixelStorage(true);
@@ -359,16 +404,94 @@ export class Renderer {
     ): ShadedTileSet {
         const ts = new ShadedTileSet();
         ts.shading = !noShading;
+        // Everything built here is a sprite sheet — the wall and flat atlases
+        // come through their own setters, which turn this back off. A sprite
+        // is one draw for a whole billboard, few enough a frame to shade as it
+        // is drawn rather than storing every frame at every shade.
+        ts.setLazyShading(true);
         ts.setShadingLayerCount(this._shading.shades);
         ts.setImage(image, width, height);
         this._tilesets.push(ts);
         return ts;
     }
 
-    /** Drops tilesets no sprite still references. */
-    removeUnusedTileSets(): void {
-        const used = new Set(this._sprites.map((s) => s.getTileSet()));
-        this._tilesets = this._tilesets.filter((ts) => used.has(ts));
+    /**
+     * Disposes the sprite sheets no sprite references any more.
+     *
+     * For a game that spawns and despawns across a level: a sheet whose last
+     * sprite has gone is released, freeing its images and whatever it had
+     * built in the shade cache.
+     *
+     * Two kinds are deliberately spared. The wall and flat atlases, which no
+     * sprite ever references and which the renderer draws from directly; and a
+     * sheet that has never had a sprite, which is one loaded ahead of being
+     * needed. Both used to be collected here: the atlases silently vanished
+     * from the memory report, and a preloaded sheet stopped being re-shaded,
+     * so a later change to `shades` left it indexing rows that were no longer
+     * there. Use {@link disposeTileSet} to release a preloaded sheet.
+     *
+     * @returns how many were disposed
+     */
+    removeUnusedTileSets(): number {
+        const used = new Set<ShadedTileSet>();
+        for (const sprite of this._sprites) {
+            const ts = sprite.getTileSet();
+            if (ts !== null) {
+                used.add(ts);
+            }
+        }
+        const kept: ShadedTileSet[] = [];
+        let disposed = 0;
+        for (const ts of this._tilesets) {
+            const collectable =
+                !used.has(ts) &&
+                ts !== this._walls &&
+                ts !== this._flats &&
+                this._everBound.has(ts);
+            if (collectable) {
+                this._everBound.delete(ts);
+                ts.dispose();
+                ++disposed;
+            } else {
+                kept.push(ts);
+            }
+        }
+        this._tilesets = kept;
+        return disposed;
+    }
+
+    /**
+     * Unregisters a tileset and releases everything it holds.
+     *
+     * The explicit form of {@link removeUnusedTileSets}, for a sheet the
+     * renderer cannot know is finished with — one loaded ahead of time, or one
+     * a pool is retiring between levels.
+     *
+     * Any sprite still holding it draws nothing from then on, rather than
+     * throwing; that is deliberate, so retiring a sheet mid-frame cannot take
+     * the frame with it. Disposing the wall or flat atlas also clears it here,
+     * leaving the renderer without one until it is set again.
+     */
+    disposeTileSet(tileset: ShadedTileSet): void {
+        this.releaseTileSet(tileset);
+    }
+
+    /** Shared by {@link disposeTileSet} and the texture setters. */
+    private releaseTileSet(tileset: ShadedTileSet | null): void {
+        if (tileset === null || tileset.disposed) {
+            return;
+        }
+        this._tilesets = this._tilesets.filter((ts) => ts !== tileset);
+        this._everBound.delete(tileset);
+        if (tileset === this._walls) {
+            this._walls = null;
+        }
+        if (tileset === this._flats) {
+            this._flats = null;
+            resetFlatContext(this._flatContext);
+        }
+        tileset.dispose();
+        this.shareWithStorey();
     }
 
     /**
@@ -449,27 +572,41 @@ export class Renderer {
             }
         }
         let tilesets = 0;
+        let cached = 0;
         for (const ts of counted) {
             tilesets += ts.getMemoryUsage();
+            cached += ts.getCacheUsage();
         }
 
         const { decals, lightMaps } = this._csm.getMemoryUsage();
         const bg = this._background;
         const background = bg === null ? 0 : bg.width * bg.height * 4;
         const canvas = this._renderCanvas;
-        const screen =
-            (adopted || canvas === null ? 0 : canvas.width * canvas.height * 4) +
-            (this._flatContext.renderSurface?.data.byteLength ?? 0);
-        const storey = this._storey?.getMemoryUsage().total ?? 0;
+        const screen = adopted || canvas === null ? 0 : canvas.width * canvas.height * 4;
+        let frameBuffer = this._flatContext.renderSurface?.data.byteLength ?? 0;
 
+        // A storey's working memory is rolled up into this renderer's, so that
+        // every field stays a straight sum and `storey` stays one number: what
+        // the floors above cost to hold.
+        const above = this._storey?.getMemoryUsage();
+        const storey = above?.resident ?? 0;
+        cached += above?.shadeCache ?? 0;
+        frameBuffer += above?.frameBuffer ?? 0;
+
+        const resident = tilesets + decals + lightMaps + background + screen + storey;
+        const working = cached + frameBuffer;
         return {
             tilesets,
+            shadeCache: cached,
             decals,
             lightMaps,
             background,
             screen,
             storey,
-            total: tilesets + decals + lightMaps + background + screen + storey,
+            frameBuffer,
+            resident,
+            working,
+            total: resident + working,
         };
     }
 
@@ -748,6 +885,7 @@ export class Renderer {
         const sprite = new Sprite();
         sprite.setTileSet(tileset);
         this._sprites.push(sprite);
+        this._everBound.add(tileset);
         return sprite;
     }
 
@@ -830,7 +968,7 @@ export class Renderer {
             }
             this._csm.shadeAllSurfaces(s.shades, s.color, s.filter, s.brightness);
             for (const ts of this._tilesets) {
-                if (ts !== this._walls && ts !== this._flats) {
+                if (ts !== this._walls && ts !== this._flats && !ts.disposed) {
                     ts.setShadingLayerCount(s.shades);
                     ts.compute(s.color, s.filter, s.brightness);
                 }

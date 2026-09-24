@@ -3,7 +3,14 @@ export * from './consts.js';
 export { MarkerRegistry } from './core/MarkerRegistry.js';
 export { Grid } from './core/Grid.js';
 export { line as bresenhamLine } from './core/bresenham.js';
-export { distance, squareDistance, circleInRect, linear } from './core/geometry.js';
+export {
+    distance,
+    squareDistance,
+    circleInRect,
+    linear,
+    wrapAngle,
+    wrapAngleSigned,
+} from './core/geometry.js';
 export * as Canvas from './core/canvas.js';
 export type { ImageSource, FilterColor } from './core/canvas.js';
 
@@ -19,6 +26,8 @@ export { CellSurfaceManager, isWallFace } from './map/CellSurfaceManager.js';
 export type { CellSurface } from './map/CellSurfaceManager.js';
 
 export { ShadedTileSet } from './texture/ShadedTileSet.js';
+export { ShadeCache, shadeCache } from './texture/ShadeCache.js';
+export type { ShadeCacheStats } from './texture/ShadeCache.js';
 export type { ShadingParams } from './texture/ShadedTileSet.js';
 export { TileAnimation, createTileAnimation } from './texture/TileAnimation.js';
 export type { TileAnimationDef } from './texture/TileAnimation.js';

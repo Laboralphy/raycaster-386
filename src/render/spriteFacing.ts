@@ -44,9 +44,15 @@ export function faceCamera(
         return sprite.direction;
     }
     const toCamera = angleBetween(cameraX, cameraY, sprite.x, sprite.y);
-    let a = facing + Math.PI / sectors - toCamera;
+    // Reduce into [0, 2*PI) before quantising. `facing` is whatever the caller
+    // has accumulated — a sprite turning on the spot winds past a revolution
+    // within seconds and keeps going — so adding 2*PI once, as this did, fixes
+    // an angle between -2*PI and 0 and nothing beyond it. Past that the index
+    // came out negative and setDirection threw. The same correction was made
+    // in renderSprites for the camera's angle; this is the other half of it.
+    let a = (facing + Math.PI / sectors - toCamera) % (2 * Math.PI);
     if (a < 0) {
-        a = 2 * Math.PI + a;
+        a += 2 * Math.PI;
     }
     const direction = (((sectors * a) / (2 * Math.PI)) | 0) % sectors;
     if (direction !== sprite.direction) {
