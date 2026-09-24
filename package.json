@@ -1,6 +1,6 @@
 {
     "name": "@laboralphy/raycaster386",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "A raycasting engine in TypeScript. Renders like it's 1992; runs like it isn't.",
     "type": "module",
     "main": "./dist/index.js",
@@ -57,6 +57,7 @@
         "test:watch": "vitest",
         "bench": "vitest run --config vitest.bench.config.ts",
         "demo": "node scripts/demo.mjs",
+        "profile": "node scripts/profile.mjs",
         "demo:watch": "node scripts/demo.mjs --watch"
     },
     "keywords": [

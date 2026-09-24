@@ -1,5 +1,4 @@
 import { FACE_CEILING, FACE_COUNT, FACE_FLOOR } from '../consts.js';
-import { context2d } from '../core/canvas.js';
 import { resolveTile, type CellCodes, type RenderContext } from '../raycast/context.js';
 import type { Scene } from '../raycast/Scene.js';
 
@@ -9,11 +8,17 @@ import type { Scene } from '../raycast/Scene.js';
  * The shaded flat tileset is read as raw 32-bit pixels rather than drawn, so
  * the floor and ceiling can be textured per pixel. Both the source atlas and
  * the destination frame are kept as Uint32Array views.
+ *
+ * The source pixels belong to the tileset, which stores its shaded layers
+ * that way (see `ShadedTileSet.setPixelStorage`); this only points at them.
+ * Reading them back from the canvas here instead stored the atlas a second
+ * time, and a third for every upper storey, each with its own context.
  */
 export interface FlatContext {
-    image: HTMLCanvasElement | null;
-    imageData: ImageData | null;
-    imageData32: Uint32Array | null;
+    /** The flat tileset's shaded pixels, as a 32-bit view. Not owned. */
+    pixels32: Uint32Array | null;
+    /** Width of the atlas {@link pixels32} holds, the stride of a pixel row. */
+    pixelsWidth: number;
     renderSurface: ImageData | null;
     renderSurface32: Uint32Array | null;
     /**
@@ -31,9 +36,8 @@ export interface FlatContext {
 
 export function createFlatContext(): FlatContext {
     return {
-        image: null,
-        imageData: null,
-        imageData32: null,
+        pixels32: null,
+        pixelsWidth: 0,
         renderSurface: null,
         renderSurface32: null,
         floorTiles: new Int32Array(0),
@@ -41,11 +45,10 @@ export function createFlatContext(): FlatContext {
     };
 }
 
-/** Drops the cached source pixels, forcing a re-read on the next frame. */
+/** Drops the source pixels and the frame buffer, forcing both to be reset. */
 export function resetFlatContext(fc: FlatContext): void {
-    fc.image = null;
-    fc.imageData = null;
-    fc.imageData32 = null;
+    fc.pixels32 = null;
+    fc.pixelsWidth = 0;
     fc.renderSurface = null;
     fc.renderSurface32 = null;
 }
@@ -85,24 +88,24 @@ export function renderFlats(
     renderContext: CanvasRenderingContext2D,
     fc: FlatContext
 ): void {
-    const image = fc.image;
-    if (image === null) {
+    const aFloorSurf = fc.pixels32;
+    const prof = ctx.profiler;
+    if (aFloorSurf === null) {
         return;
+    }
+    if (prof !== null) {
+        prof.probe(renderContext);
+        prof.mark('flush');
     }
     const w = ctx.screenWidth;
     const h = ctx.screenWidth >> 1;
     const hPhys = ctx.screenHeight >> 1;
 
-    if (fc.imageData === null) {
-        const imgData = context2d(image).getImageData(0, 0, image.width, image.height);
-        fc.imageData = imgData;
-        fc.imageData32 = new Uint32Array(imgData.data.buffer);
-    }
     fc.renderSurface = renderContext.getImageData(0, 0, w, hPhys << 1);
     fc.renderSurface32 = new Uint32Array(fc.renderSurface.data.buffer);
     resolveFlatTiles(fc, ctx.cellCodes);
+    prof?.mark('flatsRead');
 
-    const aFloorSurf = fc.imageData32 as Uint32Array;
     const aRenderSurf = fc.renderSurface32;
 
     const { direction, fov } = scene.camera;
@@ -132,7 +135,7 @@ export function renderFlats(
 
     const xCam = cam.x;
     const yCam = cam.y;
-    const nFloorWidth = image.width;
+    const nFloorWidth = fc.pixelsWidth;
     const xyMax = ctx.map.size * ps;
     const st = ctx.shades - 1;
     const sf = ctx.shadingFactor;
@@ -147,6 +150,11 @@ export function renderFlats(
     const csmH = csm.height;
     const floorTiles = fc.floorTiles;
     const ceilTiles = fc.ceilTiles;
+    // Rows an opaque wall will be drawn over, per column. The wall is drawn
+    // after this pass and repaints them, so rasterising the floor or the
+    // ceiling there is work whose result never reaches the screen.
+    const coverTop = ctx.coverTop;
+    const coverBottom = ctx.coverBottom;
     // Read the map through its backing store: the inner loop cannot afford an
     // accessor call per pixel.
     const mapData = ctx.map.data;
@@ -176,6 +184,12 @@ export function renderFlats(
     let code = 0;
     let floorPixels: Uint32Array | null = null;
     let ceilPixels: Uint32Array | null = null;
+    /** Screen rows the current iteration writes. */
+    let rowFloor = 0;
+    let rowCeil = 0;
+    /** Whether a wall will cover this pixel's floor / ceiling row. */
+    let hidFloor = false;
+    let hidCeil = false;
 
     if (fvh === 1) {
         for (let y = 1, hMax = h - offsetTop; y < hMax; ++y) {
@@ -186,6 +200,8 @@ export function renderFlats(
             yDeltaFront = yDelta * dFront;
             wy = w * (h + y) - offsetTopPix;
             wyCeil = w * (h - y - 1) - offsetTopPix;
+            rowFloor = h + y - offsetTop;
+            rowCeil = h - y - 1 - offsetTop;
             yOfs = Math.min(st, (dFront / sf) | 0);
 
             // The cell under the cursor changes far less often than once per
@@ -197,11 +213,16 @@ export function renderFlats(
             code = 0;
             if (pow2) {
                 for (let x = 0; x < w; ++x) {
-                    ofsDst = wy + x;
-                    ofsDstCeil = wyCeil + x;
-                    fy64 = fy >> psh;
-                    fx64 = fx >> psh;
-                    if (fx >= 0 && fy >= 0 && fx < xyMax && fy < xyMax) {
+                    // Cover is tested before anything else: a pixel a wall
+                    // will repaint should not pay even for its own index
+                    // arithmetic.
+                    hidFloor = rowFloor < coverBottom[x];
+                    hidCeil = rowCeil >= coverTop[x];
+                    if ((!hidFloor || !hidCeil) && fx >= 0 && fy >= 0 && fx < xyMax && fy < xyMax) {
+                        ofsDst = wy + x;
+                        ofsDstCeil = wyCeil + x;
+                        fy64 = fy >> psh;
+                        fx64 = fx >> psh;
                         if (fx64 !== cellX || fy64 !== cellY) {
                             cellX = fx64;
                             cellY = fy64;
@@ -220,12 +241,12 @@ export function renderFlats(
                         lmCorr = lmData[((lmc * fy) >> psh) * lmWidth + ((lmc * fx) >> psh)];
                         yOfsCorr = Math.max(0, yOfs - lmCorr);
 
-                        if (floorPixels !== null) {
+                        if (!hidFloor && floorPixels !== null) {
                             ofsSrc = ((fy & psm) + yOfsCorr * ps) * ps + (fx & psm);
                             aRenderSurf[ofsDst] = floorPixels[ofsSrc];
                             drawn += 1;
                         }
-                        if (ceilPixels !== null) {
+                        if (!hidCeil && ceilPixels !== null) {
                             if (drawn === 0) {
                                 ofsSrc = ((fy & psm) + yOfsCorr * ps) * ps + (fx & psm);
                             }
@@ -233,7 +254,7 @@ export function renderFlats(
                             drawn += 2;
                         }
                         if (drawn !== 3) {
-                            if (drawn !== 1) {
+                            if (drawn !== 1 && !hidFloor) {
                                 xOfs = floorTiles[code];
                                 if (xOfs >= 0) {
                                     ofsSrc =
@@ -242,7 +263,7 @@ export function renderFlats(
                                     aRenderSurf[ofsDst] = aFloorSurf[ofsSrc];
                                 }
                             }
-                            if (drawn !== 2) {
+                            if (drawn !== 2 && !hidCeil) {
                                 xOfs = ceilTiles[code];
                                 if (xOfs >= 0) {
                                     ofsSrc =
@@ -258,11 +279,16 @@ export function renderFlats(
                 }
             } else {
                 for (let x = 0; x < w; ++x) {
-                    ofsDst = wy + x;
-                    ofsDstCeil = wyCeil + x;
-                    fy64 = (fy / ps) | 0;
-                    fx64 = (fx / ps) | 0;
-                    if (fx >= 0 && fy >= 0 && fx < xyMax && fy < xyMax) {
+                    // Cover is tested before anything else: a pixel a wall
+                    // will repaint should not pay even for its own index
+                    // arithmetic.
+                    hidFloor = rowFloor < coverBottom[x];
+                    hidCeil = rowCeil >= coverTop[x];
+                    if ((!hidFloor || !hidCeil) && fx >= 0 && fy >= 0 && fx < xyMax && fy < xyMax) {
+                        ofsDst = wy + x;
+                        ofsDstCeil = wyCeil + x;
+                        fy64 = (fy / ps) | 0;
+                        fx64 = (fx / ps) | 0;
                         if (fx64 !== cellX || fy64 !== cellY) {
                             cellX = fx64;
                             cellY = fy64;
@@ -282,12 +308,12 @@ export function renderFlats(
                             lmData[(((lmc * fy) / ps) | 0) * lmWidth + (((lmc * fx) / ps) | 0)];
                         yOfsCorr = Math.max(0, yOfs - lmCorr);
 
-                        if (floorPixels !== null) {
+                        if (!hidFloor && floorPixels !== null) {
                             ofsSrc = (((fy % ps) | 0) + yOfsCorr * ps) * ps + ((fx % ps) | 0);
                             aRenderSurf[ofsDst] = floorPixels[ofsSrc];
                             drawn += 1;
                         }
-                        if (ceilPixels !== null) {
+                        if (!hidCeil && ceilPixels !== null) {
                             if (drawn === 0) {
                                 ofsSrc = (((fy % ps) | 0) + yOfsCorr * ps) * ps + ((fx % ps) | 0);
                             }
@@ -295,7 +321,7 @@ export function renderFlats(
                             drawn += 2;
                         }
                         if (drawn !== 3) {
-                            if (drawn !== 1) {
+                            if (drawn !== 1 && !hidFloor) {
                                 xOfs = floorTiles[code];
                                 if (xOfs >= 0) {
                                     ofsSrc =
@@ -304,7 +330,7 @@ export function renderFlats(
                                     aRenderSurf[ofsDst] = aFloorSurf[ofsSrc];
                                 }
                             }
-                            if (drawn !== 2) {
+                            if (drawn !== 2 && !hidCeil) {
                                 xOfs = ceilTiles[code];
                                 if (xOfs >= 0) {
                                     ofsSrc =
@@ -352,6 +378,7 @@ export function renderFlats(
             xDeltaFront = xDelta * dFront;
             yDeltaFront = yDelta * dFront;
             wy = w * (h + y - 1) - offsetTopPix;
+            rowFloor = h + y - 1 - offsetTop;
             yOfs = Math.min(st, (dFront / sf) | 0);
 
             dFrontCeil = (fhCeil * ff) / y;
@@ -360,16 +387,17 @@ export function renderFlats(
             xDeltaFrontCeil = xDelta * dFrontCeil;
             yDeltaFrontCeil = yDelta * dFrontCeil;
             wyCeil = w * (h - y) - offsetTopPix;
+            rowCeil = h - y - offsetTop;
             yOfsCeil = Math.min(st, (dFrontCeil / sf) | 0);
             void yOfsCeil;
 
             if (pow2) {
                 for (let x = 0; x < w; ++x) {
-                    ofsDst = wy + x;
-                    ofsDstCeil = wyCeil + x;
-                    fy64 = fy >> psh;
-                    fx64 = fx >> psh;
-                    if (fx >= 0 && fy >= 0 && fx < xyMax && fy < xyMax) {
+                    hidFloor = rowFloor < coverBottom[x];
+                    if (!hidFloor && fx >= 0 && fy >= 0 && fx < xyMax && fy < xyMax) {
+                        ofsDst = wy + x;
+                        fy64 = fy >> psh;
+                        fx64 = fx >> psh;
                         if (fx64 !== cellX || fy64 !== cellY) {
                             cellX = fx64;
                             cellY = fy64;
@@ -395,7 +423,15 @@ export function renderFlats(
                             }
                         }
                     }
-                    if (fxCeil >= 0 && fyCeil >= 0 && fxCeil < xyMax && fyCeil < xyMax) {
+                    hidCeil = rowCeil >= coverTop[x];
+                    if (
+                        !hidCeil &&
+                        fxCeil >= 0 &&
+                        fyCeil >= 0 &&
+                        fxCeil < xyMax &&
+                        fyCeil < xyMax
+                    ) {
+                        ofsDstCeil = wyCeil + x;
                         fy64 = fyCeil >> psh;
                         fx64 = fxCeil >> psh;
                         if (fx64 !== ceilCellX || fy64 !== ceilCellY) {
@@ -433,11 +469,11 @@ export function renderFlats(
                 }
             } else {
                 for (let x = 0; x < w; ++x) {
-                    ofsDst = wy + x;
-                    ofsDstCeil = wyCeil + x;
-                    fy64 = (fy / ps) | 0;
-                    fx64 = (fx / ps) | 0;
-                    if (fx >= 0 && fy >= 0 && fx < xyMax && fy < xyMax) {
+                    hidFloor = rowFloor < coverBottom[x];
+                    if (!hidFloor && fx >= 0 && fy >= 0 && fx < xyMax && fy < xyMax) {
+                        ofsDst = wy + x;
+                        fy64 = (fy / ps) | 0;
+                        fx64 = (fx / ps) | 0;
                         if (fx64 !== cellX || fy64 !== cellY) {
                             cellX = fx64;
                             cellY = fy64;
@@ -464,7 +500,15 @@ export function renderFlats(
                             }
                         }
                     }
-                    if (fxCeil >= 0 && fyCeil >= 0 && fxCeil < xyMax && fyCeil < xyMax) {
+                    hidCeil = rowCeil >= coverTop[x];
+                    if (
+                        !hidCeil &&
+                        fxCeil >= 0 &&
+                        fyCeil >= 0 &&
+                        fxCeil < xyMax &&
+                        fyCeil < xyMax
+                    ) {
+                        ofsDstCeil = wyCeil + x;
                         fy64 = (fyCeil / ps) | 0;
                         fx64 = (fxCeil / ps) | 0;
                         if (fx64 !== ceilCellX || fy64 !== ceilCellY) {
@@ -507,5 +551,7 @@ export function renderFlats(
             }
         }
     }
+    prof?.mark('flatsLoop');
     renderContext.putImageData(fc.renderSurface, 0, 0);
+    prof?.mark('flatsWrite');
 }

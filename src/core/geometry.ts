@@ -46,6 +46,42 @@ export function angle(x1: number, y1: number, x2: number, y2: number): number {
     return Math.atan2(y2 - y1, x2 - x1);
 }
 
+/** A full turn, in radians. */
+const TURN = Math.PI * 2;
+
+/**
+ * Reduces an angle to [0, 2*PI), whatever it started as.
+ *
+ * For keeping an accumulated heading tidy: a sprite turning on the spot winds
+ * past a revolution within seconds, and an angle read back as 48213.9 tells
+ * nobody anything, in a log or in a saved game.
+ *
+ * Not for precision — a double holds an angle to about 1e-15 rad at one
+ * revolution and still to 1e-9 after a year of spinning, against 0.004 rad for
+ * one screen pixel of rotation, so nothing here is at risk either way. The
+ * engine's own maths reduces what it is given: see `faceCamera`.
+ *
+ * `%` alone would not do: it keeps the sign of its left operand, so -0.3
+ * stays -0.3 rather than becoming 5.98.
+ */
+export function wrapAngle(a: number): number {
+    const wrapped = a - TURN * Math.floor(a / TURN);
+    // floor() of a tiny negative puts the result exactly on the turn, which is
+    // outside the range this promises.
+    return wrapped === TURN ? 0 : wrapped;
+}
+
+/**
+ * Reduces an angle to (-PI, PI], the half turn either side of straight ahead.
+ *
+ * The form to use for a difference between two angles: the sign is the way to
+ * turn and the magnitude is how far, so the shorter way round falls out.
+ */
+export function wrapAngleSigned(a: number): number {
+    const wrapped = wrapAngle(a + Math.PI) - Math.PI;
+    return wrapped === -Math.PI ? Math.PI : wrapped;
+}
+
 /**
  * Linear interpolation: the y of `v` on the segment (x1, y1)-(x3, y3).
  */

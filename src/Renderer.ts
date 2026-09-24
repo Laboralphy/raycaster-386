@@ -1,4 +1,5 @@
 import {
+    FACE_COUNT,
     METRIC_LIGHTMAP_SCALE,
     PHYS_INVISIBLE_BLOCK,
     PHYS_NONE,
@@ -42,6 +43,7 @@ import {
     type FlatContext,
 } from './render/renderFlats.js';
 import { renderScreenSliceBuffer } from './render/renderScreenSlice.js';
+import type { Profiler } from './render/Profiler.js';
 import { renderSprites } from './render/renderSprites.js';
 import { renderBackground } from './render/renderBackground.js';
 
@@ -99,6 +101,50 @@ export interface LightHandle {
     remove(): void;
 }
 
+/**
+ * Bytes held by a renderer, broken down by what holds them.
+ *
+ * Two kinds, and the difference is what matters when deciding whether a level
+ * is too big: **resident** memory is what the level costs for as long as it is
+ * loaded, and **working** memory fills as the renderer draws, stays under a
+ * bound, and is recycled. Only the first grows with the size of a level.
+ */
+export interface MemoryUsage {
+    /** Wall, flat and sprite tilesets: their originals and shaded layers. */
+    tilesets: number;
+    /**
+     * Sprite frames shaded on demand and kept in the shared cache.
+     *
+     * Working memory rather than a cost of the level: it fills as sprites are
+     * drawn, is bounded by the cache's budget, and is recycled. Counted in
+     * {@link total} but kept out of {@link tilesets}, so that number stays a
+     * statement about what the level holds.
+     */
+    shadeCache: number;
+    /** Textures painted onto cell surfaces. */
+    decals: number;
+    /** The surface and cell light maps, which scale with the map size. */
+    lightMaps: number;
+    /** The backdrop, scaled to the screen. */
+    background: number;
+    /** The canvas frames are drawn into. */
+    screen: number;
+    /** The resident memory of upper storeys, over what they share. */
+    storey: number;
+    /**
+     * The pixel buffer the flat rasteriser reads the frame back into.
+     *
+     * Working memory: `getImageData` hands over a new one every frame and the
+     * collector takes the last. It scales with the screen, never the level.
+     */
+    frameBuffer: number;
+    /** What the level costs to hold: everything above but the last two. */
+    resident: number;
+    /** Memory that fills as the renderer draws and is recycled. */
+    working: number;
+    total: number;
+}
+
 /** Resources an upper storey shares with the floor below it. */
 export interface SharedResources {
     walls: ShadedTileSet | null;
@@ -144,6 +190,13 @@ export class Renderer {
      */
     shadingFactor = 50;
 
+    /**
+     * Collects per-phase frame timings while set. Null, the default, costs a
+     * null check per phase. See {@link Profiler}: a profiled frame is slower
+     * than a real one, deliberately.
+     */
+    profiler: Profiler | null = null;
+
     /** Smaller values dim the whole scene faster with distance. */
     private _screen: ScreenSettings = { ...DEFAULT_SCREEN };
     private _metrics: MetricsSettings = { ...DEFAULT_METRICS };
@@ -179,6 +232,16 @@ export class Renderer {
     private _scanCells: MarkerRegistry | null = null;
     private _scanFrontCells: MarkerRegistry | null = null;
     private _aimedCell: AimedCell | null = null;
+
+    /**
+     * Tilesets that have had a sprite at some point.
+     *
+     * {@link removeUnusedTileSets} collects what no sprite references, and
+     * this is how it tells a sheet whose sprites have all gone from one that
+     * was loaded ahead of time and has yet to be used. Collecting the second
+     * kind is what made that method unsafe to call.
+     */
+    private _everBound = new Set<ShadedTileSet>();
 
     /** Reused every ray instead of allocating a Set per screen column. */
     private _exclusionRegistry = new MarkerRegistry();
@@ -297,15 +360,26 @@ export class Renderer {
      * `metrics.height` tall.
      */
     setWallTextures(image: ImageSource): void {
+        // Replacing an atlas used to leave the old one registered, re-shaded
+        // on every shading change for as long as the renderer lived.
+        this.releaseTileSet(this._walls);
         this._walls = this.buildTileSet(image, this._metrics.spacing, this._metrics.height);
+        // Walls are drawn a slice per screen column, far too often to shade
+        // one at a time; they keep every layer.
+        this._walls.setLazyShading(false);
         this._dirty |= Dirty.Shading;
         this.shareWithStorey();
     }
 
     /** Sets the floor and ceiling atlas. Tiles are square. */
     setFlatTextures(image: ImageSource): void {
+        this.releaseTileSet(this._flats);
         const s = this._metrics.spacing;
         this._flats = this.buildTileSet(image, s, s);
+        this._flats.setLazyShading(false);
+        // Flats are sampled per pixel and never drawn, so the shaded layers
+        // are kept as pixels rather than as a canvas as well.
+        this._flats.setPixelStorage(true);
         this._dirty |= Dirty.Shading | Dirty.Flats;
         this.shareWithStorey();
     }
@@ -330,24 +404,209 @@ export class Renderer {
     ): ShadedTileSet {
         const ts = new ShadedTileSet();
         ts.shading = !noShading;
+        // Everything built here is a sprite sheet — the wall and flat atlases
+        // come through their own setters, which turn this back off. A sprite
+        // is one draw for a whole billboard, few enough a frame to shade as it
+        // is drawn rather than storing every frame at every shade.
+        ts.setLazyShading(true);
         ts.setShadingLayerCount(this._shading.shades);
         ts.setImage(image, width, height);
         this._tilesets.push(ts);
         return ts;
     }
 
-    /** Drops tilesets no sprite still references. */
-    removeUnusedTileSets(): void {
-        const used = new Set(this._sprites.map((s) => s.getTileSet()));
-        this._tilesets = this._tilesets.filter((ts) => used.has(ts));
+    /**
+     * Disposes the sprite sheets no sprite references any more.
+     *
+     * For a game that spawns and despawns across a level: a sheet whose last
+     * sprite has gone is released, freeing its images and whatever it had
+     * built in the shade cache.
+     *
+     * Two kinds are deliberately spared. The wall and flat atlases, which no
+     * sprite ever references and which the renderer draws from directly; and a
+     * sheet that has never had a sprite, which is one loaded ahead of being
+     * needed. Both used to be collected here: the atlases silently vanished
+     * from the memory report, and a preloaded sheet stopped being re-shaded,
+     * so a later change to `shades` left it indexing rows that were no longer
+     * there. Use {@link disposeTileSet} to release a preloaded sheet.
+     *
+     * @returns how many were disposed
+     */
+    removeUnusedTileSets(): number {
+        const used = new Set<ShadedTileSet>();
+        for (const sprite of this._sprites) {
+            const ts = sprite.getTileSet();
+            if (ts !== null) {
+                used.add(ts);
+            }
+        }
+        const kept: ShadedTileSet[] = [];
+        let disposed = 0;
+        for (const ts of this._tilesets) {
+            const collectable =
+                !used.has(ts) &&
+                ts !== this._walls &&
+                ts !== this._flats &&
+                this._everBound.has(ts);
+            if (collectable) {
+                this._everBound.delete(ts);
+                ts.dispose();
+                ++disposed;
+            } else {
+                kept.push(ts);
+            }
+        }
+        this._tilesets = kept;
+        return disposed;
     }
 
-    /** Approximate bytes held by every tileset. */
-    getMemoryUsage(): { tilesets: number } {
+    /**
+     * Unregisters a tileset and releases everything it holds.
+     *
+     * The explicit form of {@link removeUnusedTileSets}, for a sheet the
+     * renderer cannot know is finished with — one loaded ahead of time, or one
+     * a pool is retiring between levels.
+     *
+     * Any sprite still holding it draws nothing from then on, rather than
+     * throwing; that is deliberate, so retiring a sheet mid-frame cannot take
+     * the frame with it. Disposing the wall or flat atlas also clears it here,
+     * leaving the renderer without one until it is set again.
+     */
+    disposeTileSet(tileset: ShadedTileSet): void {
+        this.releaseTileSet(tileset);
+    }
+
+    /** Shared by {@link disposeTileSet} and the texture setters. */
+    private releaseTileSet(tileset: ShadedTileSet | null): void {
+        if (tileset === null || tileset.disposed) {
+            return;
+        }
+        this._tilesets = this._tilesets.filter((ts) => ts !== tileset);
+        this._everBound.delete(tileset);
+        if (tileset === this._walls) {
+            this._walls = null;
+        }
+        if (tileset === this._flats) {
+            this._flats = null;
+            resetFlatContext(this._flatContext);
+        }
+        tileset.dispose();
+        this.shareWithStorey();
+    }
+
+    /**
+     * Draws every texture once, so that the first frames need not.
+     *
+     * A browser does not hand a canvas to the GPU when it is decoded, but the
+     * first time something samples it. For a level with fifty-odd atlases that
+     * lands on the first frames as a stutter: measured on the demo level in
+     * Firefox, a cold frame cost 33 ms against 8 ms warm, and the cost was
+     * charged to whichever pass happened to touch each atlas first.
+     *
+     * Call it once, after the textures are in and before the first
+     * {@link render} — while a loading screen is still up, which is the point.
+     * Each texture is drawn whole into a single pixel: the sampling costs
+     * nothing, and it is being sampled at all that makes it resident.
+     *
+     * Flats are left out on purpose. The flat rasteriser reads them as pixels
+     * and never draws them, so they are never uploaded.
+     */
+    warmUpTextures(): void {
+        this.revalidate();
+        const ctx = this._renderContext;
+        if (ctx === null) {
+            return;
+        }
+        const touch = (image: HTMLCanvasElement | null): void => {
+            if (image === null || image.width === 0 || image.height === 0) {
+                return;
+            }
+            ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, 1, 1);
+        };
+
+        touch(this._background);
+        touch(this._walls?.getImage() ?? null);
+        for (const ts of this._tilesets) {
+            if (ts !== this._flats) {
+                touch(ts.getImage());
+            }
+        }
+        // Decals painted on walls are drawn like the walls they cover; the
+        // ones on floors and ceilings are sampled, like the flats.
+        const surfaces = this._csm.surfaces;
+        for (let i = 0, l = surfaces.length; i < l; ++i) {
+            if (i % FACE_COUNT < 4) {
+                touch(surfaces[i].tileset?.getImage() ?? null);
+            }
+        }
+
+        // The corner this scribbled in belongs to the next frame, which clears
+        // before drawing anyway; leaving it dirty would still be untidy.
+        this.clear(ctx);
+        this._storey?.warmUpTextures();
+    }
+
+    /**
+     * Approximate bytes held by everything this renderer keeps in memory.
+     *
+     * Every field is measured, not estimated, from the canvases and typed
+     * arrays that exist. Nothing is counted twice: a tileset several sprites
+     * share counts once, and an upper storey counts only what it owns, since
+     * it draws with the textures and the canvas of the floor below.
+     */
+    getMemoryUsage(): MemoryUsage {
+        // Walls and flats are added explicitly: they live in `_tilesets` only
+        // until removeUnusedTileSets(), which keeps sprite tilesets alone.
+        const counted = new Set<ShadedTileSet>(this._tilesets);
+        const adopted = !this._firstFloor;
+        if (adopted) {
+            // Owned by the ground floor, which reports them.
+            counted.delete(this._walls as ShadedTileSet);
+            counted.delete(this._flats as ShadedTileSet);
+        } else {
+            if (this._walls !== null) {
+                counted.add(this._walls);
+            }
+            if (this._flats !== null) {
+                counted.add(this._flats);
+            }
+        }
+        let tilesets = 0;
+        let cached = 0;
+        for (const ts of counted) {
+            tilesets += ts.getMemoryUsage();
+            cached += ts.getCacheUsage();
+        }
+
+        const { decals, lightMaps } = this._csm.getMemoryUsage();
+        const bg = this._background;
+        const background = bg === null ? 0 : bg.width * bg.height * 4;
+        const canvas = this._renderCanvas;
+        const screen = adopted || canvas === null ? 0 : canvas.width * canvas.height * 4;
+        let frameBuffer = this._flatContext.renderSurface?.data.byteLength ?? 0;
+
+        // A storey's working memory is rolled up into this renderer's, so that
+        // every field stays a straight sum and `storey` stays one number: what
+        // the floors above cost to hold.
+        const above = this._storey?.getMemoryUsage();
+        const storey = above?.resident ?? 0;
+        cached += above?.shadeCache ?? 0;
+        frameBuffer += above?.frameBuffer ?? 0;
+
+        const resident = tilesets + decals + lightMaps + background + screen + storey;
+        const working = cached + frameBuffer;
         return {
-            // The original called getConsumedBytes(), which does not exist on
-            // ShadedTileSet, so this method always threw.
-            tilesets: this._tilesets.reduce((sum, ts) => sum + ts.getMemoryUsage(), 0),
+            tilesets,
+            shadeCache: cached,
+            decals,
+            lightMaps,
+            background,
+            screen,
+            storey,
+            frameBuffer,
+            resident,
+            working,
+            total: resident + working,
         };
     }
 
@@ -472,9 +731,19 @@ export class Renderer {
         this._renderContext = res.context;
         this._renderCanvas = res.canvas;
         this._offsetTop = res.offsetTop;
-        if (this._flats !== null) {
-            this._flatContext.image = this._flats.getImage();
-        }
+        // Point at the ground floor's flat pixels rather than reading a copy
+        // of our own. Reassigned outright: the previous code only refreshed
+        // `image`, leaving a storey sampling the atlas it had cached before
+        // the floor below replaced its flat textures.
+        this.useFlatPixels();
+    }
+
+    /** Points the flat rasteriser at the current flat tileset's pixels. */
+    private useFlatPixels(): void {
+        const fc = this._flatContext;
+        const flats = this._flats;
+        fc.pixels32 = flats?.getPixels32() ?? null;
+        fc.pixelsWidth = flats?.getPixels()?.width ?? 0;
     }
 
     private shareWithStorey(): void {
@@ -616,6 +885,7 @@ export class Renderer {
         const sprite = new Sprite();
         sprite.setTileSet(tileset);
         this._sprites.push(sprite);
+        this._everBound.add(tileset);
         return sprite;
     }
 
@@ -694,18 +964,18 @@ export class Renderer {
                 this._flats.setShadingLayerCount(s.shades);
                 this._flats.compute(s.color, s.filter, s.brightness);
                 resetFlatContext(this._flatContext);
-                this._flatContext.image = this._flats.getImage();
+                this.useFlatPixels();
             }
             this._csm.shadeAllSurfaces(s.shades, s.color, s.filter, s.brightness);
             for (const ts of this._tilesets) {
-                if (ts !== this._walls && ts !== this._flats) {
+                if (ts !== this._walls && ts !== this._flats && !ts.disposed) {
                     ts.setShadingLayerCount(s.shades);
                     ts.compute(s.color, s.filter, s.brightness);
                 }
             }
         } else if (dirty & Dirty.Flats) {
             resetFlatContext(this._flatContext);
-            this._flatContext.image = this._flats?.getImage() ?? null;
+            this.useFlatPixels();
         }
         this.shareWithStorey();
     }
@@ -734,6 +1004,9 @@ export class Renderer {
                 offsetTop: 0,
                 stretch: false,
                 firstFloor: this._firstFloor,
+                coverTop: new Int32Array(0),
+                coverBottom: new Int32Array(0),
+                profiler: null,
             } as RenderContext;
         }
         const m = c as Mutable<RenderContext>;
@@ -747,6 +1020,11 @@ export class Renderer {
         m.shadingFactor = this.shadingFactor;
         m.offsetTop = this._offsetTop;
         m.stretch = this._stretch;
+        m.profiler = this.profiler;
+        if (m.coverTop.length !== m.screenWidth) {
+            m.coverTop = new Int32Array(m.screenWidth);
+            m.coverBottom = new Int32Array(m.screenWidth);
+        }
         return c;
     }
 
@@ -799,6 +1077,11 @@ export class Renderer {
         const zbuffer = scene.zbuffer;
         const middle = width >> 1;
         const exclusion = this._exclusionRegistry;
+
+        // An empty band per column: createScreenSlice widens it for every
+        // opaque wall it emits, and the flat rasteriser reads the result.
+        ctx.coverTop.fill(ctx.screenHeight);
+        ctx.coverBottom.fill(0);
 
         for (let i = 0; i < width; ++i) {
             scene.resume.active = false;
@@ -856,28 +1139,51 @@ export class Renderer {
      * instance — kept whatever the previous frame drew there.
      */
     render(x: number, y: number, angle: number, height: number): void {
+        const prof = this.profiler;
+        prof?.startFrame();
         this.revalidate();
         this.updateStaticLightMap();
+        prof?.mark('setup');
 
         const scene = this.computeScene(x, y, angle, height);
         const renderContext = this._renderContext;
         if (renderContext === null) {
             return;
         }
+        prof?.mark('raycast');
 
         this.clear(renderContext);
+        prof?.mark('clear');
         renderBackground(
             this._background,
             renderContext,
             this._screen.height,
             this._bgOffset + this._bgCameraOffset
         );
+        prof?.mark('background');
         if (scene.storeyScene !== null) {
-            renderScreenSliceBuffer(scene.storeyScene, renderContext);
+            // The storey is drawn first, so anything an opaque ground-floor
+            // wall will cover is skipped rather than drawn and painted over.
+            const ctx = this.context();
+            renderScreenSliceBuffer(scene.storeyScene, renderContext, {
+                top: ctx.coverTop,
+                bottom: ctx.coverBottom,
+            });
         }
+        prof?.mark('storey');
+        // The flat rasteriser marks its own phases, the first of which is the
+        // flush that everything above is really paying for.
         renderFlats(this.context(), scene, renderContext, this._flatContext);
         renderScreenSliceBuffer(scene, renderContext);
+        prof?.mark('slices');
+        if (prof !== null) {
+            // Nothing else reads pixels after the slices, so without this they
+            // would be rasterised in the next frame and charged to it.
+            prof.probe(renderContext);
+            prof.mark('present');
+        }
         this._debugDisplay.display(renderContext, 0, this._offsetTop);
+        prof?.endFrame();
     }
 
     /**

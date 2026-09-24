@@ -107,8 +107,9 @@ describe('Sprite facings', () => {
 
     it('refuses an animation with no facings', () => {
         const s = new Sprite();
-        expect(() => s.buildAnimation({ starts: [], length: 2, duration: 100, loop: 1 }, 'walk'))
-            .toThrow(/declares no facings/);
+        expect(() =>
+            s.buildAnimation({ starts: [], length: 2, duration: 100, loop: 1 }, 'walk')
+        ).toThrow(/declares no facings/);
     });
 
     it('rejects a facing outside the group rather than crashing on undefined', () => {
@@ -138,6 +139,59 @@ describe('Sprite facings', () => {
             seen.add(s.direction);
         }
         expect(seen).toEqual(new Set([0, 1, 2, 3]));
+    });
+
+    it('takes a facing that has wound past a revolution, either way', () => {
+        // What a sprite turning on the spot hands it: an angle nobody wrapped.
+        // One revolution takes seconds, and the original correction — a single
+        // `+ 2*PI` — stopped working the moment the angle passed -2*PI, which
+        // made setDirection throw and took the frame loop with it.
+        const s = new Sprite();
+        s.buildAnimation(
+            { starts: [0, 1, 2, 3, 4, 5, 6, 7], length: 1, duration: 100, loop: 0 },
+            'walk'
+        );
+        s.setCurrentAnimation('walk');
+        s.x = 0;
+        s.y = 0;
+
+        for (const turns of [-12, -3.5, -1, 0, 1, 4.25, 30]) {
+            for (let i = 0; i < 16; ++i) {
+                const facing = turns * Math.PI * 2 + (i / 16) * Math.PI * 2;
+                const camera = (i / 16) * Math.PI * 2;
+                const direction = faceCamera(
+                    s,
+                    facing,
+                    Math.cos(camera) * 90,
+                    Math.sin(camera) * 90
+                );
+                expect(direction).toBeGreaterThanOrEqual(0);
+                expect(direction).toBeLessThan(s.facings);
+            }
+        }
+    });
+
+    it('winds to the same facing a whole revolution later', () => {
+        const s = new Sprite();
+        s.buildAnimation(
+            { starts: [0, 1, 2, 3, 4, 5, 6, 7], length: 1, duration: 100, loop: 0 },
+            'walk'
+        );
+        s.setCurrentAnimation('walk');
+        s.x = 0;
+        s.y = 0;
+
+        // Sampled between sector boundaries, never on one: winding an angle
+        // that sits exactly on a boundary through twelve PI leaves it a float
+        // hair to either side, and which sector it lands in is then a coin
+        // toss. That is arithmetic, not a facing bug, and a sprite drawn one
+        // frame off at the instant it crosses is invisible.
+        for (let i = 0; i < 16; ++i) {
+            const facing = ((i + 0.5) / 16) * Math.PI * 2;
+            const here = faceCamera(s, facing, 90, 0);
+            expect(faceCamera(s, facing + 6 * Math.PI * 2, 90, 0)).toBe(here);
+            expect(faceCamera(s, facing - 6 * Math.PI * 2, 90, 0)).toBe(here);
+        }
     });
 
     it('leaves a single-facing sprite alone', () => {

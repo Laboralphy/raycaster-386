@@ -3,7 +3,14 @@ export * from './consts.js';
 export { MarkerRegistry } from './core/MarkerRegistry.js';
 export { Grid } from './core/Grid.js';
 export { line as bresenhamLine } from './core/bresenham.js';
-export { distance, squareDistance, circleInRect, linear } from './core/geometry.js';
+export {
+    distance,
+    squareDistance,
+    circleInRect,
+    linear,
+    wrapAngle,
+    wrapAngleSigned,
+} from './core/geometry.js';
 export * as Canvas from './core/canvas.js';
 export type { ImageSource, FilterColor } from './core/canvas.js';
 
@@ -19,6 +26,8 @@ export { CellSurfaceManager, isWallFace } from './map/CellSurfaceManager.js';
 export type { CellSurface } from './map/CellSurfaceManager.js';
 
 export { ShadedTileSet } from './texture/ShadedTileSet.js';
+export { ShadeCache, shadeCache } from './texture/ShadeCache.js';
+export type { ShadeCacheStats } from './texture/ShadeCache.js';
 export type { ShadingParams } from './texture/ShadedTileSet.js';
 export { TileAnimation, createTileAnimation } from './texture/TileAnimation.js';
 export type { TileAnimationDef } from './texture/TileAnimation.js';
@@ -39,6 +48,7 @@ export type {
     ShadingSettings,
     CellMaterial,
     LightHandle,
+    MemoryUsage,
     SharedResources,
 } from './Renderer.js';
 export { createScene } from './raycast/Scene.js';
@@ -51,6 +61,8 @@ export { createScreenSlice } from './raycast/createScreenSlice.js';
 export { resolveTile } from './raycast/context.js';
 export type { RenderContext, CellCodes, SurfaceTile } from './raycast/context.js';
 export { renderFlats, createFlatContext, resetFlatContext } from './render/renderFlats.js';
+export { Profiler, PHASE_HELP } from './render/Profiler.js';
+export type { Phase, ProfileReport } from './render/Profiler.js';
 export type { FlatContext } from './render/renderFlats.js';
 export { renderScreenSlice, renderScreenSliceBuffer } from './render/renderScreenSlice.js';
 export { renderSprite, renderSprites } from './render/renderSprites.js';

@@ -60,10 +60,43 @@ export function renderScreenSlice(slice: ZSlice, rc: CanvasRenderingContext2D): 
     }
 }
 
-/** Draws every slice of a scene, in buffer order. */
-export function renderScreenSliceBuffer(scene: Scene, rc: CanvasRenderingContext2D): void {
+/**
+ * Draws every slice of a scene, in buffer order.
+ *
+ * `cover` is the band an opaque wall of the floor below will be drawn over,
+ * per column, and is passed when drawing an upper storey: that storey goes
+ * down before the floor below it, so a slice sitting entirely inside the band
+ * is painted over and need never be drawn. Measured in Firefox, issuing the
+ * storey's slices was a third of the frame on its own.
+ */
+export function renderScreenSliceBuffer(
+    scene: Scene,
+    rc: CanvasRenderingContext2D,
+    cover: { top: Int32Array; bottom: Int32Array } | null = null
+): void {
     const zbuffer = scene.zbuffer;
     for (let i = 0, l = zbuffer.length; i < l; ++i) {
-        renderScreenSlice(zbuffer[i], rc);
+        const slice = zbuffer[i];
+        if (cover !== null && isCovered(slice, cover.top, cover.bottom)) {
+            continue;
+        }
+        renderScreenSlice(slice, rc);
     }
+}
+
+/** Whether every column of a slice falls inside the covered band. */
+function isCovered(slice: ZSlice, top: Int32Array, bottom: Int32Array): boolean {
+    const dy = slice[6];
+    const dyEnd = dy + slice[8];
+    const x0 = slice[5] | 0;
+    const x1 = Math.min(x0 + (slice[7] | 0), top.length);
+    if (x0 < 0 || x0 >= x1) {
+        return false;
+    }
+    for (let x = x0; x < x1; ++x) {
+        if (dy < top[x] || dyEnd > bottom[x]) {
+            return false;
+        }
+    }
+    return true;
 }
