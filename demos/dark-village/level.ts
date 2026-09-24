@@ -1,12 +1,12 @@
 /**
  * Where this demo's level and its tuning live.
  *
- * Unlike `demos/simple`, the map is not written here: it is a real MapEdit
- * level, converted to RCE-100 by `scripts/convert-mapedit-level.mjs` and read
- * at runtime by `loadLevel`. Everything below is what the *game* adds on top.
+ * Unlike `demos/simple`, the map is not written here: it is a real level built
+ * in the MapEdit editor, published as RCE-100 and read at runtime by
+ * `loadLevel`. Everything below is what the *game* adds on top.
  */
 
-/** The converted level. The editor's own save file is under `assets/levels/`. */
+/** The level, as the editor published it. */
 export const LEVEL_URL = 'assets/level-1.rce.json';
 
 /**

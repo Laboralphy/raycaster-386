@@ -19,10 +19,6 @@ jobs:
       - run: npm ci
 
       # typecheck, lint, format, test and build: the same gate a release runs.
-      # The MapEdit save is committed, so a skipped fidelity suite here means
-      # something went missing, not that the fixture is optional.
       - run: npm run check
-        env:
-          RAYCASTER_REQUIRE_FIXTURES: '1'
 
       - run: npm run types

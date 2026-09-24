@@ -25,8 +25,8 @@ function levelData(): RceLevel {
 }
 
 /**
- * End-to-end check of the second demo, against a real MapEdit level converted
- * by `scripts/convert-mapedit-level.mjs`.
+ * End-to-end check of the second demo, against a real level built in the
+ * MapEdit editor and published as RCE-100.
  *
  * Unlike `demos/simple`, nothing here is hand-written: the map, its materials,
  * its scenery and its start point all come out of the level file, so this also

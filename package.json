@@ -13,9 +13,6 @@
             ],
             "schema": [
                 "./dist/level/schema.d.ts"
-            ],
-            "mapedit": [
-                "./dist/mapedit/index.d.ts"
             ]
         }
     },
@@ -31,10 +28,6 @@
         "./schema": {
             "types": "./dist/level/schema.d.ts",
             "import": "./dist/schema.js"
-        },
-        "./mapedit": {
-            "types": "./dist/mapedit/index.d.ts",
-            "import": "./dist/mapedit.js"
         }
     },
     "files": [

@@ -17,8 +17,8 @@ collisions and triggers that runs just as well on a server with no canvas.
 - **Deterministic by construction.** Doors, animations and scheduled commands
   advance on ticks you supply, and every stateful piece can be saved and
   restored.
-- **Real level format.** Loads RCE-100 levels, and ships a converter from
-  MapEdit saves.
+- **Real level format.** Loads RCE-100 levels, the format the MapEdit level
+  editor publishes.
 
 ## Contents
 
@@ -29,7 +29,6 @@ collisions and triggers that runs just as well on a server with no canvas.
 - [The cell map](#the-cell-map)
 - [The game loop](#the-game-loop)
 - [Simulation](#simulation)
-- [Converting MapEdit levels](#converting-mapedit-levels)
 - [Architecture](#architecture)
 - [Development](#development)
 - [Background](#background)
@@ -44,7 +43,7 @@ The package is **ESM only**: load it with `import`, or with `await import()`
 from CommonJS. Type declarations are included.
 
 Rendering needs a Canvas 2D implementation — a browser, or a canvas package
-under Node. The simulation, the schema and the MapEdit converter need nothing.
+under Node. The simulation and the schema need nothing.
 
 ## Entry points
 
@@ -53,7 +52,6 @@ under Node. The simulation, the schema and the MapEdit converter need nothing.
 | `@laboralphy/raycaster386` | Core (`CellMap`, `Vector`, geometry, constants) and rendering (`Renderer`, `Sprite`, `MapHelper`, `loadLevel`, `buildObjects`, `SpriteBinding`) | a browser, for rendering |
 | `@laboralphy/raycaster386/simulation` | `DoorPolicy`, `ActorRegistry`, `Actor`, `moveActor`, `Smasher`, `TagTriggers`, `Scheduler`, `Easing` | anywhere |
 | `@laboralphy/raycaster386/schema` | The RCE-100 JSON schema, as data | anywhere |
-| `@laboralphy/raycaster386/mapedit` | `convertMapEditLevel`, and the MapEdit save types | anywhere |
 
 Code shared between entry points is emitted once, so a `Vector` imported from
 the root is the same class the simulation works with.
@@ -585,32 +583,6 @@ console.log(doors.isDoorOpen(5, 5)); // true
 Importing the root entry point under Node is safe: only rendering calls need a
 canvas.
 
-## Converting MapEdit levels
-
-MapEdit saves its own format — unmerged tiles, room for undo — and RCE-100 is
-the build artifact made from it. `convertMapEditLevel` does that compilation
-anywhere, but leaves the one host-specific step to you: combining tiles into a
-sheet.
-
-```ts
-import { convertMapEditLevel } from '@laboralphy/raycaster386/mapedit';
-import type { ImageAppender, MapEditLevel } from '@laboralphy/raycaster386/mapedit';
-
-const append: ImageAppender = async (tiles, start, count) => {
-    // Lay `count` tiles out left to right, starting at `start`, and store the sheet.
-    const sheet = await drawSheet(tiles.slice(start, start + count));
-    // Report the size of ONE frame, not of the whole sheet.
-    return { src: sheet.url, width: sheet.frameWidth, height: sheet.frameHeight };
-};
-
-const save = (await (await fetch('level-1.json')).json()) as MapEditLevel;
-const rce = await convertMapEditLevel(save, append);
-```
-
-An unrecognised save version is refused rather than converted on a guess.
-[`scripts/convert-mapedit-level.mjs`](scripts/convert-mapedit-level.mjs) is a
-complete Node implementation over `@napi-rs/canvas`.
-
 ## Architecture
 
 The library is built in tiers, and one rule holds them apart.
@@ -640,7 +612,6 @@ src/
   map/            per-face surfaces and decals, MapHelper
   level/          RCE-100 types, loadLevel, buildObjects, the schema
   simulation/     doors, actors, collision, tags, scheduler, easing
-  mapedit/        the MapEdit to RCE-100 converter
   Renderer.ts     the renderer
   Sprite.ts       billboards
 ```
@@ -651,18 +622,17 @@ src/
 npm install
 npm run check         # typecheck, lint, format, test and build: run before committing
 npm test              # tests only
-npm run demo          # the demos on http://localhost:8080 (simple, dark-village)
+npm run demo          # the demos on http://localhost:8080
 npm run bench         # renderer cost against tests/bench/baseline.json
 npm run build         # bundles into dist/
 npm run types         # declarations into dist/, after build
-
-# Converts a demo's MapEdit save to RCE-100.
-node scripts/convert-mapedit-level.mjs demos/dark-village
+npm run profile       # per-phase frame timings for the dark-village level
 ```
 
 The demos are small complete games: `demos/simple` builds its map in code,
 `demos/dark-village` loads a real 59×59 level with an upper storey, a secret
-passage and tagged cells.
+passage and tagged cells, and `demos/sprite-stress` generates a large open
+level to measure what sprites cost.
 
 ### Golden images
 
@@ -680,9 +650,6 @@ Re-recording blesses whatever the renderer draws now, bugs included: read the
 diffs in `.golden-out/` first. [`tests/golden/README.md`](tests/golden/README.md)
 records where the baselines came from, and why seven of them deliberately
 differ from the original engine's output.
-
-The fidelity test for the MapEdit converter skips when its fixture is missing.
-`RAYCASTER_REQUIRE_FIXTURES=1` turns that into a failure, as CI does.
 
 ## Background
 

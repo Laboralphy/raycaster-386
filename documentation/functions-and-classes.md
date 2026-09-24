@@ -25,7 +25,6 @@ hover.
   - [Tags and triggers](#tags-and-triggers)
   - [Time and events](#time-and-events)
 - [`@laboralphy/raycaster386/schema`](#laboralphyraycaster-386schema)
-- [`@laboralphy/raycaster386/mapedit`](#laboralphyraycaster-386mapedit)
 
 ---
 
@@ -732,9 +731,3 @@ the default export. Pass it to a JSON-schema validator inside `loadLevel`'s
 
 ---
 
-## `@laboralphy/raycaster386/mapedit`
-
-| Function | What it does |
-|---|---|
-| `convertMapEditLevel(save, append)` | Compiles a MapEdit save into an RCE-100 level. Combining tiles into sheets is delegated to `append`, the one host-specific step. Refuses a save version it does not know. |
-| `mapEditVersionOf(save)` | The save's format version, treating a file that predates the field as the first version. |

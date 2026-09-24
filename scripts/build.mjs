@@ -31,8 +31,7 @@ const options = {
     entryPoints: {
         index: 'src/index.ts',
         simulation: 'src/simulation/index.ts',
-        schema: 'src/level/schema.ts',
-        mapedit: 'src/mapedit/index.ts'
+        schema: 'src/level/schema.ts'
     },
     outdir,
     entryNames: '[name]',
