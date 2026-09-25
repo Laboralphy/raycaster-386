@@ -77,8 +77,10 @@
     "bugs": {
         "url": "https://github.com/Laboralphy/raycaster-386/issues"
     },
+    "dependencies": {
+        "@laboralphy/rainbow": "^3.0.0"
+    },
     "devDependencies": {
-        "@laboralphy/rainbow": "^3.0.0",
         "@napi-rs/canvas": "^1.0.8",
         "@types/node": "^26.5.0",
         "@vitest/coverage-v8": "^5.0.0",
