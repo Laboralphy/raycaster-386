@@ -51,9 +51,12 @@ resize, so it is now derived and read-only).
 
 **Kept**: the second storey, and `paintSurface` wall decals.
 
-**`SPRITE_Z_SCALE`** (upstream `MAGIC_DIST_RATIO`) is preserved exactly, only
-renamed and documented. Wall shading and slice height both read the unscaled
-wall distance, so normalising the two distance scales would shift the look.
+**`SPRITE_Z_SCALE`** (upstream `MAGIC_DIST_RATIO`) turned out to be
+`1 / cos(fov / 2)` at the default field of view,
+`1 / Math.cos(Math.atan2(9, 16))`; the renderer now derives it from the field
+of view, and the constant is that default value. Wall shading and slice height both read the
+unscaled wall distance, so normalising the two distance scales would shift
+the look.
 
 ## Verification
 

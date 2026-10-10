@@ -14,8 +14,9 @@ renderers on the same scene and compared them pixel for pixel. That harness and
 the original were removed on 2026-09-11, once the port stopped being a
 migration and started being the thing itself.
 
-So these files are now the *frozen answer* to "what is correct", and nothing
-can re-derive them. `UPDATE_GOLDEN=1` re-records from the port, which means a
+So these files were the *frozen answer* to "what is correct", and nothing
+can re-derive them. Since 2026-10-10 they are the port's own output (see
+below). `UPDATE_GOLDEN=1` re-records from the port, which means a
 bug you introduce becomes the new baseline if you update without looking.
 **Read the diff artefacts in `.golden-out/` before re-recording.**
 
@@ -29,6 +30,26 @@ baseline nobody can explain is a baseline nobody dares change.
 | `animated-flats--frame-0`, `animated-flats--frame-2` | The original read an animated flat face straight out of the cell-code table and multiplied it by the cell size, so the `TileAnimation` became `NaN`, and `NaN \| 0` collapsed to 0 — sampling column 0 of the atlas for every pixel. The port resolves the animation to a frame. |
 | `room--crouched` | One pixel. The original computed a flat source row as `((fy % ps) + layer * ps) \| 0`; where `fy % ps` landed just under the cell size (255.99999999999997) the addition rounded the deficit away to exactly 512, one row past the atlas — an out-of-bounds read yielding a transparent pixel. The port truncates before adding. |
 | `sprites--wound-two-turns`, `sprites--wound-negative` | A camera angle is accumulated and never wrapped. The original reduced a sprite's bearing into (-PI, PI] by adding or subtracting `2 * PI` exactly once, which cannot close a gap several revolutions wide, so past ~1.38 net turns its sprites failed the off-axis test and vanished — while the walls, cast with periodic `cos`/`sin`, rendered normally. The port reduces with a modulo. See `tests/spriteCulling.test.ts`. |
+
+## 2026-10-10: every baseline re-recorded for the exact projection
+
+All 45 were re-recorded from the port when the projection stopped depending
+on an empirical constant. The original drew walls and flats with half the
+screen width as their vertical scale, and a focal of `(width / 2) * (16 / 9)`
+chosen so that walls and sprites roughly agreed; `SPRITE_Z_SCALE` was the
+matching depth correction, found by trial. Both follow from one fact: each
+column's ray direction is interpolated between the edges of the field of
+view, so wall distances are perpendicular distances divided by
+`cos(fov / 2)`. Walls and flats now use the exact vertical scale,
+`focal / (2 cos(fov / 2))`, which makes pixels square at any field of view
+and screen shape (see `tests/fieldOfView.test.ts`).
+
+At the default field of view that scale is 1.98% larger than the original's,
+so every frame differs from the original's: walls, doors and flats are drawn
+about 2% taller, sprites are unchanged. The diffs were reviewed before
+re-recording: same geometry, same sprites, only that vertical scaling (and
+the floor and ceiling pixels it shifts). The seven deliberate differences
+listed above still hold on top of it.
 
 ## The poses, and why these ones
 

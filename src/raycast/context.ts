@@ -55,6 +55,13 @@ export interface RenderContext {
     wallHeight: number;
     screenWidth: number;
     screenHeight: number;
+    /**
+     * Half-height on screen of a wall slice per unit of ray distance,
+     * `focal / (2 cos(fov / 2))`: see {@link Renderer.setScreen}.
+     */
+    verticalScale: number;
+    /** Sprite distance to wall z scale, for the z-buffer sort: 1 / cos(fov / 2). */
+    spriteDepthScale: number;
     /** Number of precomputed shading layers. */
     shades: number;
     /** World distance over which shading deepens by one layer. */

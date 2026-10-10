@@ -131,7 +131,9 @@ export function renderFlats(
     const fh = yTexture2 - (fvh - 1) * yTexture2;
     const xDelta = (wx2 - wx1) / w;
     const yDelta = (wy2 - wy1) / w;
-    const ff = h << 1;
+    // vertical scale of the projection, as for wall slices; h is the
+    // horizon row of the square layout
+    const ff = 2 * ctx.verticalScale;
 
     const xCam = cam.x;
     const yCam = cam.y;

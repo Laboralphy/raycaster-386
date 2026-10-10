@@ -62,7 +62,11 @@ Decisions taken with the original author before starting.
   Removing it collapses `drawTile()` to a single unbranched `drawImage`.
 - **`screen.focal` as an input.** `adaptFocal()` overwrote whatever the caller
   set on every resize, so it is now derived and read-only:
-  `(width >> 1) * (16 / 9)`.
+  `(width >> 1) * (16 / 9)`. Since 2026-10-10 it is derived from a field of
+  view, `setScreen({ width, height, fov })`, whose default `DEFAULT_FOV`
+  reproduces that focal; walls and flats use the exact vertical scale
+  `focal / (2 cos(fov / 2))` instead of half the screen width (2% taller at
+  the default, see `tests/golden/README.md`).
 - **`CellSurface.diffuse`.** Written once at init, never read.
 
 If VR is wanted later it should be reintroduced as a wrapper that renders two
@@ -122,10 +126,14 @@ original wrote directly into the other instance's private fields.
 
 ### Preserved deliberately
 
-- **`SPRITE_Z_SCALE`** (upstream `MAGIC_DIST_RATIO = 1.14734748441786`).
-  Renamed and documented, not normalised away: wall shading and slice height
-  both read the *unscaled* wall distance, so changing the scale shifts the
-  rendered look. It is a sort-key correction only.
+- **`SPRITE_Z_SCALE`** (upstream `MAGIC_DIST_RATIO = 1.14734748441786`, found
+  empirically). Not normalised away: wall shading and slice height both read
+  the *unscaled* wall distance, so changing the scale shifts the rendered
+  look. It is a sort-key correction only, and it is `1 / cos(fov / 2)`: ray
+  directions are interpolated between the edges of the field of view, so a
+  wall's distance is its perpendicular distance divided by `cos(fov / 2)`.
+  The renderer now derives it from its field of view; the constant is its
+  value at `DEFAULT_FOV`, `1 / Math.cos(Math.atan2(9, 16))`.
 - **The 3-deep lookback in `optimizeBuffer`.** It merges interleaved slices
   from transparent walls, where one column emits several through
   `scene.resume`. `castRay` allows up to six resumes, so three is a

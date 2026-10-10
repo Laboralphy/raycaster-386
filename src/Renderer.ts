@@ -4,6 +4,7 @@ import {
     PHYS_INVISIBLE_BLOCK,
     PHYS_NONE,
     PHYS_TRANSPARENT_BLOCK,
+    DEFAULT_FOV,
     type Face,
 } from './consts.js';
 import {
@@ -61,6 +62,12 @@ const enum Dirty {
 export interface ScreenSettings {
     width: number;
     height: number;
+    /**
+     * Horizontal field of view, in radians, strictly between 0 and PI.
+     * Defaults to {@link DEFAULT_FOV}, about 58.7 degrees. The vertical field
+     * of view follows from the height: pixels are square at any screen shape.
+     */
+    fov?: number;
 }
 
 export interface MetricsSettings {
@@ -160,6 +167,28 @@ export interface SharedResources {
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 const DEFAULT_SCREEN: ScreenSettings = { width: 256, height: 256 };
+
+interface Projection {
+    focal: number;
+    verticalScale: number;
+    spriteDepthScale: number;
+}
+
+/**
+ * The projection of a screen `width` pixels wide with a horizontal field of
+ * view `fov`. See {@link Renderer.setScreen}.
+ */
+function computeProjection(width: number, fov: number): Projection {
+    const half = fov / 2;
+    const focal = (width >> 1) / Math.tan(half);
+    return {
+        focal,
+        verticalScale: focal / (2 * Math.cos(half)),
+        spriteDepthScale: 1 / Math.cos(half),
+    };
+}
+
+const DEFAULT_PROJECTION = computeProjection(DEFAULT_SCREEN.width, DEFAULT_FOV);
 const DEFAULT_METRICS: MetricsSettings = { spacing: 64, height: 96 };
 const DEFAULT_SHADING: ShadingSettings = {
     shades: 16,
@@ -221,7 +250,11 @@ export class Renderer {
     private _flatContext: FlatContext = createFlatContext();
     private _debugDisplay = new DebugDisplay();
 
-    private _focal = (DEFAULT_SCREEN.width >> 1) * (16 / 9);
+    private _focal = DEFAULT_PROJECTION.focal;
+    /** Half-height of a wall slice per unit of ray distance; see {@link setScreen}. */
+    private _verticalScale = DEFAULT_PROJECTION.verticalScale;
+    /** Converts a sprite's distance to the wall z scale; see {@link setScreen}. */
+    private _spriteDepthScale = DEFAULT_PROJECTION.spriteDepthScale;
     private _offsetTop = 0;
     private _bgOffset = 0;
     private _bgCameraOffset = 0;
@@ -256,7 +289,7 @@ export class Renderer {
      */
     constructor(map: CellMap = new CellMap()) {
         this._map = map;
-        this._offsetTop = (DEFAULT_SCREEN.width - DEFAULT_SCREEN.height) >>> 1;
+        this._offsetTop = (DEFAULT_SCREEN.width - DEFAULT_SCREEN.height) >> 1;
     }
 
     // ---------------------------------------------------------------- state
@@ -271,8 +304,9 @@ export class Renderer {
     }
 
     /**
-     * Projection focal length. Derived from the screen width; the original
-     * exposed it as a setting but overwrote it on every resize.
+     * Projection focal length, derived from the screen width and the field of
+     * view; the original exposed it as a setting but overwrote it on every
+     * resize.
      */
     get focal(): number {
         return this._focal;
@@ -316,12 +350,41 @@ export class Renderer {
 
     // -------------------------------------------------------------- setters
 
-    setScreen({ width, height }: ScreenSettings): void {
-        this._screen = { width, height };
-        this._focal = (width >> 1) * (16 / 9);
-        this._offsetTop = (width - height) >>> 1;
+    /**
+     * Sets the screen size and, optionally, the horizontal field of view.
+     *
+     * The focal follows from the field of view: `(width / 2) / tan(fov / 2)`.
+     * Each column casts a ray whose direction is interpolated between the two
+     * edges of the field of view, so it is not a unit vector: its component
+     * along the view axis is `cos(fov / 2)` in every column. A wall's
+     * distance, measured along that vector, is therefore its perpendicular
+     * distance divided by `cos(fov / 2)`, which is what keeps the projection
+     * free of fisheye. Two consequences:
+     *
+     * - walls and flats get a half-height of `focal / (2 cos(fov / 2))` per
+     *   unit of that distance, the same scale as the focal gives sprites:
+     *   pixels are square, whatever the field of view and the screen shape;
+     * - sprites, whose distance is perpendicular, are scaled by
+     *   `1 / cos(fov / 2)` to be sorted with the walls (see SPRITE_Z_SCALE).
+     *
+     * The image is laid out as if the screen were square, `width` by `width`,
+     * with the horizon in the middle; `offsetTop` shifts it so the horizon
+     * lands in the middle of the real screen, whatever its height.
+     */
+    setScreen({ width, height, fov = DEFAULT_FOV }: ScreenSettings): void {
+        if (!(fov > 0 && fov < Math.PI)) {
+            throw new RangeError(
+                `Renderer.setScreen: fov must be between 0 and PI radians, got ${fov}`
+            );
+        }
+        this._screen = { width, height, fov };
+        const p = computeProjection(width, fov);
+        this._focal = p.focal;
+        this._verticalScale = p.verticalScale;
+        this._spriteDepthScale = p.spriteDepthScale;
+        this._offsetTop = (width - height) >> 1;
         this._dirty |= Dirty.Screen;
-        this._storey?.setScreen({ width, height });
+        this._storey?.setScreen(this._screen);
     }
 
     setMetrics({ spacing, height }: MetricsSettings): void {
@@ -949,7 +1012,12 @@ export class Renderer {
         if (dirty & Dirty.Screen) {
             const { width, height } = this._screen;
             if (this._renderCanvas === null) {
-                this._renderCanvas = createCanvas(width, height);
+                // renderFlats reads the whole frame back and writes it again,
+                // every frame. On a GPU-backed canvas (Chromium's default)
+                // each of those is a stall while the GPU catches up and a copy
+                // across, which slows a long session down to a crawl; kept in
+                // CPU memory, it is a plain memcpy.
+                this._renderCanvas = createCanvas(width, height, { willReadFrequently: true });
             }
             this._renderCanvas.width = width;
             this._renderCanvas.height = height;
@@ -999,6 +1067,8 @@ export class Renderer {
                 wallHeight: 0,
                 screenWidth: 0,
                 screenHeight: 0,
+                verticalScale: 0,
+                spriteDepthScale: 1,
                 shades: 0,
                 shadingFactor: 0,
                 offsetTop: 0,
@@ -1016,6 +1086,8 @@ export class Renderer {
         m.wallHeight = this._metrics.height;
         m.screenWidth = this._screen.width;
         m.screenHeight = this._screen.height;
+        m.verticalScale = this._verticalScale;
+        m.spriteDepthScale = this._spriteDepthScale;
         m.shades = this._shading.shades;
         m.shadingFactor = this.shadingFactor;
         m.offsetTop = this._offsetTop;

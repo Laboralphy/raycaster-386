@@ -117,6 +117,13 @@ Angles are in radians: `0` looks along +x, and `-Math.PI / 2` looks towards the
 top of the map as written. The last argument of `render()` is eye height, where
 `1` is standing.
 
+**Field of view.** `fov` is the horizontal field of view, in radians; it
+defaults to `DEFAULT_FOV`, about 58.7 degrees. `setScreen({ width: 320,
+height: 200, fov: Math.PI / 2 })` gives 90 degrees. The focal follows,
+`(width / 2) / tan(fov / 2)`, and the vertical field of view follows from the
+height: pixels are square whatever the angle and the screen shape, portrait
+included.
+
 ## Loading a level
 
 Real levels are RCE-100 documents, the format the MapEdit level editor

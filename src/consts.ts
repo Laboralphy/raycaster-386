@@ -85,16 +85,25 @@ export const LIGHTMAP_TO_SURFACE_SHIFT = 1;
 export const SURFACE_LIGHTMAP_SCALE = METRIC_LIGHTMAP_SCALE >> LIGHTMAP_TO_SURFACE_SHIFT;
 
 /**
- * Wall z (`t * spacing`) and sprite z (the projected distance `f`) are on
- * different scales; this reconciles them so a single sort can interleave
- * walls and sprites correctly.
- *
- * Do not try to normalise this away: wall shading (`z / shadingFactor`) and
- * slice height (`yscr * ytex / z`) both read the *unscaled* wall distance, so
- * changing the scale shifts the rendered look. It is a sort key correction
- * only. (Original name: MAGIC_DIST_RATIO.)
+ * Default horizontal field of view, in radians (about 58.7 degrees): the
+ * original's focal length, `(width / 2) * (16 / 9)`, so `tan(fov / 2) = 9 / 16`.
+ * The 16 / 9 is not a screen aspect ratio: any screen shape works, and the
+ * vertical field of view follows from the screen height.
  */
-export const SPRITE_Z_SCALE = 1.14734748441786;
+export const DEFAULT_FOV = 2 * Math.atan2(9, 16);
+
+/**
+ * Sprite distance to wall z scale at the default field of view.
+ *
+ * Wall distances are measured along ray directions interpolated between the
+ * two edges of the field of view, whose component along the view axis is
+ * `cos(fov / 2)` in every column; sprite distances are perpendicular. A
+ * single z-buffer sort needs them on one scale, hence `1 / cos(fov / 2)`. The
+ * renderer derives it from its own field of view (see `Renderer.setScreen`):
+ * this is its value at {@link DEFAULT_FOV}. (Original name: MAGIC_DIST_RATIO,
+ * found empirically as 1.14734748441786.)
+ */
+export const SPRITE_Z_SCALE = 1 / Math.cos(DEFAULT_FOV / 2);
 
 /** Cell bit layout: offset(8) | phys(4) | material(12). */
 export const CELL_MATERIAL_MASK = 0xfff;
