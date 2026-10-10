@@ -38,12 +38,15 @@ export function createScreenSlice(
 
     const ytex = ctx.wallHeight;
     const xtex = ctx.spacing;
-    const xscr = ctx.screenWidth;
     const yscr = ctx.screenWidth >> 1;
     const shades = ctx.shades;
     const halfShades = shades >> 1;
 
-    const dz = ((yscr * ytex) / z) | 0;
+    // yscr is the horizon of the square layout; the slice height comes from
+    // the projection scale
+    const yScale = ctx.verticalScale;
+    const xScale = 2 * yScale;
+    const dz = ((yScale * ytex) / z) | 0;
     const dzy = yscr - dz * scene.camera.height;
 
     const phys = physOf(panel);
@@ -79,13 +82,13 @@ export function createScreenSlice(
             slice[2] += offset;
             if (offset > 0) {
                 slice[4] = ytex - offset;
-                slice[8] = slice[4] / (z / xscr) + 0.5;
+                slice[8] = slice[4] / (z / xScale) + 0.5;
             }
             break;
 
         case PHYS_CURT_UP:
             if (offset > 0) {
-                slice[8] = (ytex - offset) / (z / xscr) + 0.5;
+                slice[8] = (ytex - offset) / (z / xScale) + 0.5;
             }
             break;
 
@@ -96,7 +99,7 @@ export function createScreenSlice(
         case PHYS_DOOR_DOWN:
             if (offset > 0) {
                 slice[4] = ytex - offset;
-                slice[8] = slice[4] / (z / xscr) + 0.5;
+                slice[8] = slice[4] / (z / xScale) + 0.5;
                 slice[6] += (dz - slice[8]) << 1;
                 slice[8] <<= 1;
             }

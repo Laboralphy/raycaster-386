@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { allCases, SCENES } from '../harness/scenes.js';
 import { buildPortRenderer, renderPort, renderPortFrame } from '../harness/portRenderer.js';
 import { compareFrames, describeDiff, isClean, matchGolden } from '../harness/compare.js';
+import { DEFAULT_FOV } from '../../src/consts.js';
 import { Renderer } from '../../src/Renderer.js';
 
 /**
@@ -173,7 +174,7 @@ describe('storey settings', () => {
 
         const storey = rc.createStorey();
         expect(storey.shading.shades).toBe(8);
-        expect(storey.screen).toEqual({ width: 128, height: 128 });
+        expect(storey.screen).toEqual({ width: 128, height: 128, fov: DEFAULT_FOV });
         expect(storey.metrics).toEqual({ spacing: 64, height: 96 });
         expect(storey.getMapSize()).toBe(8);
 
@@ -183,7 +184,7 @@ describe('storey settings', () => {
         rc.setScreen({ width: 64, height: 64 });
         expect(storey.shading).toEqual({ shades: 4, color: '#123456', filter: '#abcdef', brightness: 0.5 });
         expect(storey.metrics).toEqual({ spacing: 32, height: 48 });
-        expect(storey.screen).toEqual({ width: 64, height: 64 });
+        expect(storey.screen).toEqual({ width: 64, height: 64, fov: DEFAULT_FOV });
     });
 
     it('receives shadingFactor, which is a live field rather than a setter', () => {
