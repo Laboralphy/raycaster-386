@@ -43,4 +43,4 @@ jobs:
 
       - run: npm run types
 
-      - run: npm publish --provenance --access public
+      - run: npm stage publish --provenance --access public

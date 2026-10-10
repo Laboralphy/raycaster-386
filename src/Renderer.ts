@@ -373,7 +373,9 @@ export class Renderer {
      */
     setScreen({ width, height, fov = DEFAULT_FOV }: ScreenSettings): void {
         if (!(fov > 0 && fov < Math.PI)) {
-            throw new RangeError(`Renderer.setScreen: fov must be between 0 and PI radians, got ${fov}`);
+            throw new RangeError(
+                `Renderer.setScreen: fov must be between 0 and PI radians, got ${fov}`
+            );
         }
         this._screen = { width, height, fov };
         const p = computeProjection(width, fov);
@@ -1010,7 +1012,12 @@ export class Renderer {
         if (dirty & Dirty.Screen) {
             const { width, height } = this._screen;
             if (this._renderCanvas === null) {
-                this._renderCanvas = createCanvas(width, height);
+                // renderFlats reads the whole frame back and writes it again,
+                // every frame. On a GPU-backed canvas (Chromium's default)
+                // each of those is a stall while the GPU catches up and a copy
+                // across, which slows a long session down to a crawl; kept in
+                // CPU memory, it is a plain memcpy.
+                this._renderCanvas = createCanvas(width, height, { willReadFrequently: true });
             }
             this._renderCanvas.width = width;
             this._renderCanvas.height = height;
