@@ -158,7 +158,15 @@ export function createScreenSlice(
     // slice that is actually drawn, from a tile with no translucent pixel,
     // hides anything: everything else lets the floor show through. An upper
     // storey is exempt because it is drawn *before* the flats, not after.
-    if (slice[0] !== null && ctx.firstFloor && tileset.isTileOpaque(tile)) {
+    //
+    // The cover is one band per column, which assumes every opaque slice
+    // crosses the horizon. A door or curtain sliding up or down does not: its
+    // panel only spans part of the opening, and the band would swallow the
+    // gap beside it, hiding the flats seen through it until the door is fully
+    // open. Such a panel is left out; the slice behind it, reached through
+    // the gap, still records its own cover.
+    const partialPanel = offset > 0 && phys >= PHYS_DOOR_UP && phys <= PHYS_CURT_DOWN;
+    if (slice[0] !== null && !partialPanel && ctx.firstFloor && tileset.isTileOpaque(tile)) {
         const top = slice[6];
         const bottom = top + slice[8];
         if (top < ctx.coverTop[x]) {
