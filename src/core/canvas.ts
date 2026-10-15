@@ -24,20 +24,34 @@ export function getDefaultImageSmoothing(): boolean {
  * Returns a canvas' 2d context, or throws. Every call site in this library
  * treats a missing context as unrecoverable, so failing loudly here keeps
  * `CanvasRenderingContext2D | null` out of the rest of the codebase.
+ *
+ * `settings` only count on the first call for a given canvas: a browser hands
+ * back the existing context afterwards, whatever is asked.
  */
-export function context2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-    const ctx = canvas.getContext('2d');
+export function context2d(
+    canvas: HTMLCanvasElement,
+    settings?: CanvasRenderingContext2DSettings
+): CanvasRenderingContext2D {
+    const ctx = canvas.getContext('2d', settings);
     if (ctx === null) {
         throw new Error('canvas: could not acquire a 2d rendering context');
     }
     return ctx;
 }
 
-export function createCanvas(width: number, height: number): HTMLCanvasElement {
+/**
+ * @param settings context settings, fixed for the canvas' lifetime — see
+ * {@link context2d}
+ */
+export function createCanvas(
+    width: number,
+    height: number,
+    settings?: CanvasRenderingContext2DSettings
+): HTMLCanvasElement {
     const c = document.createElement('canvas');
     c.width = width;
     c.height = height;
-    const ctx = context2d(c);
+    const ctx = context2d(c, settings);
     ctx.imageSmoothingQuality = 'low';
     ctx.imageSmoothingEnabled = defaultImageSmoothing;
     return c;

@@ -1,4 +1,3 @@
-import { SPRITE_Z_SCALE } from '../consts.js';
 import { distance } from '../core/geometry.js';
 import type { RenderContext } from '../raycast/context.js';
 import type { Scene } from '../raycast/Scene.js';
@@ -81,7 +80,7 @@ export function renderSprite(ctx: RenderContext, scene: Scene, sprite: Sprite): 
         dy0,
         dw0,
         dh0,
-        f * SPRITE_Z_SCALE,
+        f * ctx.spriteDepthScale,
         sprite.flags,
     ]);
 
