@@ -46,7 +46,7 @@ import {
 import { renderScreenSliceBuffer } from './render/renderScreenSlice.js';
 import type { Profiler } from './render/Profiler.js';
 import { renderSprites } from './render/renderSprites.js';
-import { renderBackground } from './render/renderBackground.js';
+import { backgroundScroll, renderBackground } from './render/renderBackground.js';
 
 /** What needs recomputing before the next frame. */
 const enum Dirty {
@@ -57,6 +57,16 @@ const enum Dirty {
     Shading = 1 << 1,
     /** Drop the cached flat pixel data. */
     Flats = 1 << 2,
+}
+
+/** Options of {@link Renderer.setBackground}. */
+export interface BackgroundOptions {
+    /**
+     * The image covers a full turn and shows once around the camera, instead
+     * of repeating every quarter turn. To keep pace with the walls, make it
+     * the screen width × 360 / fov (in degrees) wide: 4 screens at 90°.
+     */
+    panorama?: boolean;
 }
 
 export interface ScreenSettings {
@@ -258,6 +268,7 @@ export class Renderer {
     private _offsetTop = 0;
     private _bgOffset = 0;
     private _bgCameraOffset = 0;
+    private _bgPanorama = false;
 
     private _storey: Renderer | null = null;
     private _firstFloor = true;
@@ -447,11 +458,20 @@ export class Renderer {
         this.shareWithStorey();
     }
 
-    /** Sets the backdrop, scaled to the screen height. */
-    setBackground(image: HTMLCanvasElement): void {
+    /**
+     * Sets the backdrop, scaled to the screen height. It repeats every quarter
+     * turn, unless `options.panorama` makes it cover a full turn.
+     */
+    setBackground(image: HTMLCanvasElement, options: BackgroundOptions = {}): void {
         const h = this._screen.height;
         const r = h / image.height;
         this._background = r === 1 ? image : resize(image, image.width * r, h);
+        this._bgPanorama = options.panorama === true;
+    }
+
+    /** True when the backdrop covers a full turn; see {@link setBackground}. */
+    get backgroundPanorama(): boolean {
+        return this._bgPanorama;
     }
 
     /**
@@ -1143,7 +1163,11 @@ export class Renderer {
         this._scanCells = scanCells;
 
         if (this._background !== null) {
-            this._bgCameraOffset = (2 * camera.direction * this._background.width) / Math.PI;
+            this._bgCameraOffset = backgroundScroll(
+                camera.direction,
+                this._background.width,
+                this._bgPanorama
+            );
         }
 
         const zbuffer = scene.zbuffer;

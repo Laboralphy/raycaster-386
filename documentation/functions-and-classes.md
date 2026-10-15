@@ -172,7 +172,8 @@ record what they invalidated; the work happens once, at the top of the next
 | **Textures** | |
 | `setWallTextures(image)` | Sets the wall atlas: tiles `spacing` wide and `height` tall. |
 | `setFlatTextures(image)` | Sets the floor and ceiling atlas: square tiles. |
-| `setBackground(image)` | Sets the backdrop seen past the walls, scaled to the screen height. |
+| `setBackground(image, options?)` | Sets the backdrop seen past the walls, scaled to the screen height. It repeats every quarter turn; `{ panorama: true }` makes it cover a full turn. |
+| `backgroundPanorama` | True when the backdrop covers a full turn, read-only. |
 | `backgroundOffset` | The backdrop's horizontal scroll, in pixels. |
 | `buildTileSet(image, width, height, noShading?)` | Creates a shaded tileset for sprites and registers it; `noShading` keeps it from dimming with distance. |
 | `removeUnusedTileSets()` | Drops tilesets no sprite still uses. |
@@ -263,6 +264,7 @@ actors.
 |---|---|
 | `faceCamera(sprite, facing, cameraX, cameraY)` | Turns a directional sprite pointing at angle `facing` to show the side a camera at `(cameraX, cameraY)` sees. Leaves the sprite alone when the frame would not change. |
 | `renderBackground(background, context, screenHeight, offset)` | Paints the scrolling backdrop into a context. |
+| `backgroundScroll(direction, width, panorama)` | The backdrop's scroll, in pixels, for a camera angle: one image width per quarter turn, or per full turn for a panorama. |
 
 ### `DebugDisplay`
 

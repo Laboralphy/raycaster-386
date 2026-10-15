@@ -44,6 +44,7 @@ export { DebugDisplay } from './DebugDisplay.js';
 export { Renderer } from './Renderer.js';
 export type {
     ScreenSettings,
+    BackgroundOptions,
     MetricsSettings,
     ShadingSettings,
     CellMaterial,
@@ -70,7 +71,7 @@ export { faceCamera, SPRITE_DIRECTION_COUNT } from './render/spriteFacing.js';
 export { SpriteBinding } from './render/spriteBinding.js';
 export type { CameraPosition } from './render/spriteBinding.js';
 export type { ActorId, ActorUpdate, ActorFrame } from './core/actorFrame.js';
-export { renderBackground } from './render/renderBackground.js';
+export { backgroundScroll, renderBackground } from './render/renderBackground.js';
 export { MapHelper } from './map/MapHelper.js';
 export type {
     LevelMap,

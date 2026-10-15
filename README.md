@@ -124,6 +124,40 @@ height: 200, fov: Math.PI / 2 })` gives 90 degrees. The focal follows,
 height: pixels are square whatever the angle and the screen shape, portrait
 included.
 
+### Sky
+
+A backdrop shows wherever no wall, floor or ceiling is drawn: give the cells
+open to the sky no ceiling tile. It is scaled to the screen height, with its
+horizon on the middle line, and scrolls as the camera turns.
+
+```ts
+renderer.setScreen({ width: 800, height: 500, fov: Math.PI / 2 });
+// Moon, stars and mountains all around: a 360° image, 4 screens wide at 90°.
+renderer.setBackground(await Canvas.loadCanvas('sky.png'), { panorama: true });
+```
+
+| Mode | The image covers | Width that keeps pace with the walls |
+|---|---|---|
+| default | a quarter turn, repeated 4 times around the camera | the screen width, at a 90° `fov` |
+| `panorama: true` | a full turn, shown once | screen width × 360 / `fov` in degrees |
+
+In either mode the left and right edges of the image must join, and the image
+must be at least as wide as the screen. At the wrong width the sky still wraps
+correctly but slides against the walls: slower when too narrow, faster when too
+wide.
+
+| Screen | `fov` | Panorama size |
+|---|---|---|
+| 800×500 | 90° | 3200×500 |
+| 800×500 | 60° | 4800×500 |
+| 320×200 | 90° | 1280×200 |
+| 320×200 | default (≈58.7°) | 1962×200 |
+
+Give the image the screen height, and it is used as is rather than resampled.
+`backgroundOffset` adds a scroll of your own, in pixels, for drifting clouds
+for instance. Levels loaded with `loadLevel` use the default mode; call
+`setBackground` again afterwards for a panorama.
+
 ## Loading a level
 
 Real levels are RCE-100 documents, the format the MapEdit level editor
