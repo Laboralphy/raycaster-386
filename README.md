@@ -629,10 +629,13 @@ npm run types         # declarations into dist/, after build
 npm run profile       # per-phase frame timings for the dark-village level
 ```
 
-The demos are small complete games: `demos/simple` builds its map in code,
+The demos are small complete games. `demos/simple` builds its map in code and
 `demos/dark-village` loads a real 59×59 level with an upper storey, a secret
-passage and tagged cells, and `demos/sprite-stress` generates a large open
-level to measure what sprites cost.
+passage and tagged cells — both at 320×200, the resolution the original engine
+was written for. `demos/bright-hall` runs at 800×512 in a daylit colonnade, and
+cycles down to 320×200 on a key so the cost of the pixels is visible on one
+scene. `demos/sprite-stress` generates a large open level to measure what
+sprites cost.
 
 ### Golden images
 
